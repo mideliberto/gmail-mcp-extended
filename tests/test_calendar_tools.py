@@ -592,3 +592,266 @@ class TestDetectEventsFromEmail:
 
         assert "error" in result
         assert "Not authenticated" in result["error"]
+
+
+class TestBuildRrule:
+    """Tests for build_rrule helper function."""
+
+    def test_daily_recurrence(self):
+        """Test simple daily recurrence."""
+        from gmail_mcp.calendar.processor import build_rrule
+
+        result = build_rrule("DAILY")
+        assert result == "RRULE:FREQ=DAILY"
+
+    def test_weekly_with_days(self):
+        """Test weekly recurrence with specific days."""
+        from gmail_mcp.calendar.processor import build_rrule
+
+        result = build_rrule("WEEKLY", by_day=["MO", "WE", "FR"])
+        assert result == "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR"
+
+    def test_monthly_with_interval(self):
+        """Test monthly recurrence with interval."""
+        from gmail_mcp.calendar.processor import build_rrule
+
+        result = build_rrule("MONTHLY", interval=2)
+        assert result == "RRULE:FREQ=MONTHLY;INTERVAL=2"
+
+    def test_with_count(self):
+        """Test recurrence with count limit."""
+        from gmail_mcp.calendar.processor import build_rrule
+
+        result = build_rrule("DAILY", count=10)
+        assert result == "RRULE:FREQ=DAILY;COUNT=10"
+
+    def test_with_until(self):
+        """Test recurrence with until date."""
+        from gmail_mcp.calendar.processor import build_rrule
+
+        result = build_rrule("WEEKLY", until="20241231")
+        assert result == "RRULE:FREQ=WEEKLY;UNTIL=20241231"
+
+    def test_until_with_dashes(self):
+        """Test that until date with dashes is normalized."""
+        from gmail_mcp.calendar.processor import build_rrule
+
+        result = build_rrule("MONTHLY", until="2024-12-31")
+        assert result == "RRULE:FREQ=MONTHLY;UNTIL=20241231"
+
+    def test_invalid_frequency(self):
+        """Test that invalid frequency raises ValueError."""
+        from gmail_mcp.calendar.processor import build_rrule
+
+        with pytest.raises(ValueError, match="Invalid frequency"):
+            build_rrule("HOURLY")
+
+    def test_count_and_until_conflict(self):
+        """Test that count and until cannot both be specified."""
+        from gmail_mcp.calendar.processor import build_rrule
+
+        with pytest.raises(ValueError, match="Cannot specify both"):
+            build_rrule("DAILY", count=10, until="20241231")
+
+    def test_invalid_day(self):
+        """Test that invalid day raises ValueError."""
+        from gmail_mcp.calendar.processor import build_rrule
+
+        with pytest.raises(ValueError, match="Invalid day"):
+            build_rrule("WEEKLY", by_day=["MO", "XX"])
+
+    def test_case_insensitive_frequency(self):
+        """Test that frequency is case-insensitive."""
+        from gmail_mcp.calendar.processor import build_rrule
+
+        result = build_rrule("daily")
+        assert result == "RRULE:FREQ=DAILY"
+
+    def test_case_insensitive_days(self):
+        """Test that days are case-insensitive."""
+        from gmail_mcp.calendar.processor import build_rrule
+
+        result = build_rrule("WEEKLY", by_day=["mo", "we", "fr"])
+        assert result == "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR"
+
+    def test_complex_rule(self):
+        """Test complex recurrence rule."""
+        from gmail_mcp.calendar.processor import build_rrule
+
+        result = build_rrule("WEEKLY", interval=2, by_day=["TU", "TH"], count=26)
+        assert result == "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=TU,TH;COUNT=26"
+
+
+class TestCreateRecurringEvent:
+    """Tests for create_recurring_event tool."""
+
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_calendar_service")
+    @patch("gmail_mcp.calendar.processor.get_credentials")
+    @patch("gmail_mcp.calendar.processor.build")
+    def test_create_recurring_event_success(self, mock_proc_build, mock_proc_creds,
+                                             mock_get_service, mock_get_credentials):
+        """Test successful recurring event creation."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_credentials = Mock()
+        mock_get_credentials.return_value = mock_credentials
+        mock_proc_creds.return_value = mock_credentials
+        mock_service = create_mock_calendar_service()
+        mock_get_service.return_value = mock_service
+        mock_proc_build.return_value = mock_service
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        create_recurring_event = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "create_recurring_event":
+                create_recurring_event = tool.fn
+                break
+
+        assert create_recurring_event is not None, "create_recurring_event tool not found"
+
+        result = create_recurring_event(
+            summary="Daily Standup",
+            start_time="2024-06-15T09:00:00",
+            frequency="DAILY",
+            count=10
+        )
+
+        assert result.get("success", False) or "event_id" in result
+        if result.get("success"):
+            assert "recurrence" in result
+            assert "RRULE:FREQ=DAILY" in result["recurrence"]
+
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_calendar_service")
+    @patch("gmail_mcp.calendar.processor.get_credentials")
+    @patch("gmail_mcp.calendar.processor.build")
+    def test_create_weekly_recurring_event(self, mock_proc_build, mock_proc_creds,
+                                           mock_get_service, mock_get_credentials):
+        """Test creating weekly recurring event with specific days."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_credentials = Mock()
+        mock_get_credentials.return_value = mock_credentials
+        mock_proc_creds.return_value = mock_credentials
+        mock_service = create_mock_calendar_service()
+        mock_get_service.return_value = mock_service
+        mock_proc_build.return_value = mock_service
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        create_recurring_event = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "create_recurring_event":
+                create_recurring_event = tool.fn
+                break
+
+        result = create_recurring_event(
+            summary="Team Sync",
+            start_time="2024-06-17T10:00:00",
+            end_time="2024-06-17T11:00:00",
+            frequency="WEEKLY",
+            by_day=["MO", "WE", "FR"],
+            until="2024-12-31"
+        )
+
+        assert result.get("success", False) or "event_id" in result
+        if result.get("success"):
+            assert "BYDAY=MO,WE,FR" in result["recurrence"]
+
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    def test_create_recurring_event_not_authenticated(self, mock_get_credentials):
+        """Test create_recurring_event when not authenticated."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_get_credentials.return_value = None
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        create_recurring_event = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "create_recurring_event":
+                create_recurring_event = tool.fn
+                break
+
+        result = create_recurring_event(
+            summary="Daily Standup",
+            start_time="2024-06-15T09:00:00",
+            frequency="DAILY"
+        )
+
+        assert "error" in result
+        assert "Not authenticated" in result["error"]
+
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    def test_create_recurring_event_invalid_frequency(self, mock_get_credentials):
+        """Test create_recurring_event with invalid frequency."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_credentials = Mock()
+        mock_get_credentials.return_value = mock_credentials
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        create_recurring_event = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "create_recurring_event":
+                create_recurring_event = tool.fn
+                break
+
+        result = create_recurring_event(
+            summary="Test Event",
+            start_time="2024-06-15T09:00:00",
+            frequency="HOURLY"  # Invalid
+        )
+
+        assert result.get("success") is False
+        assert "error" in result
+        assert "Invalid" in result["error"] or "frequency" in result["error"].lower()
+
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_calendar_service")
+    @patch("gmail_mcp.calendar.processor.get_credentials")
+    @patch("gmail_mcp.calendar.processor.build")
+    def test_create_biweekly_event(self, mock_proc_build, mock_proc_creds,
+                                   mock_get_service, mock_get_credentials):
+        """Test creating bi-weekly recurring event."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_credentials = Mock()
+        mock_get_credentials.return_value = mock_credentials
+        mock_proc_creds.return_value = mock_credentials
+        mock_service = create_mock_calendar_service()
+        mock_get_service.return_value = mock_service
+        mock_proc_build.return_value = mock_service
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        create_recurring_event = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "create_recurring_event":
+                create_recurring_event = tool.fn
+                break
+
+        result = create_recurring_event(
+            summary="1:1 with Manager",
+            start_time="2024-06-18T14:00:00",
+            frequency="WEEKLY",
+            interval=2,  # Every 2 weeks
+            count=12
+        )
+
+        assert result.get("success", False) or "event_id" in result
+        if result.get("success"):
+            assert "INTERVAL=2" in result["recurrence"]

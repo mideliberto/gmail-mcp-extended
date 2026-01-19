@@ -19,7 +19,8 @@ from gmail_mcp.gmail.processor import parse_email_message, extract_entities
 from gmail_mcp.calendar.processor import (
     get_user_timezone,
     create_calendar_event_object,
-    get_color_id_from_name
+    get_color_id_from_name,
+    build_rrule
 )
 
 logger = get_logger(__name__)
@@ -149,6 +150,169 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
                 "success": False,
                 "error": f"Failed to create calendar event: {e}",
                 "missing_info": missing_info
+            }
+
+    @mcp.tool()
+    def create_recurring_event(
+        summary: str,
+        start_time: str,
+        frequency: str,
+        end_time: Optional[str] = None,
+        description: Optional[str] = None,
+        location: Optional[str] = None,
+        attendees: Optional[List[str]] = None,
+        color_name: Optional[str] = None,
+        interval: int = 1,
+        count: Optional[int] = None,
+        until: Optional[str] = None,
+        by_day: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Create a recurring event in the user's Google Calendar.
+
+        This tool creates a recurring calendar event with customizable recurrence rules.
+        It supports daily, weekly, monthly, and yearly patterns.
+
+        Prerequisites:
+        - The user must be authenticated with Google Calendar access
+
+        Args:
+            summary (str): The title/summary of the event
+            start_time (str): The start time of the first occurrence (ISO format or natural language)
+            frequency (str): How often the event repeats - "DAILY", "WEEKLY", "MONTHLY", or "YEARLY"
+            end_time (str, optional): The end time of each occurrence. Defaults to 1 hour after start.
+            description (str, optional): Description or notes for the event
+            location (str, optional): Location of the event
+            attendees (List[str], optional): List of email addresses of attendees
+            color_name (str, optional): Color name for the event (e.g., "red", "blue", "green")
+            interval (int, optional): How often the event repeats (e.g., 2 = every 2 weeks). Defaults to 1.
+            count (int, optional): Number of occurrences. Cannot be used with 'until'.
+            until (str, optional): End date for recurrence (YYYY-MM-DD). Cannot be used with 'count'.
+            by_day (List[str], optional): Days of week for WEEKLY (e.g., ["MO", "WE", "FR"])
+
+        Returns:
+            Dict[str, Any]: The result including:
+                - success: Whether the operation was successful
+                - event_id: The ID of the created recurring event
+                - event_link: Direct link to the event in Google Calendar
+                - recurrence: The RRULE string used
+
+        Example usage:
+        1. Daily standup for 2 weeks:
+           create_recurring_event(
+               summary="Daily Standup",
+               start_time="2024-01-15T09:00:00",
+               frequency="DAILY",
+               count=10
+           )
+
+        2. Weekly team meeting on Mon/Wed/Fri:
+           create_recurring_event(
+               summary="Team Sync",
+               start_time="next monday at 10am",
+               frequency="WEEKLY",
+               by_day=["MO", "WE", "FR"],
+               until="2024-06-30"
+           )
+
+        3. Monthly review meeting:
+           create_recurring_event(
+               summary="Monthly Review",
+               start_time="2024-02-01T14:00:00",
+               frequency="MONTHLY",
+               interval=1,
+               count=12
+           )
+
+        4. Bi-weekly 1:1 meeting:
+           create_recurring_event(
+               summary="1:1 with Manager",
+               start_time="next tuesday at 2pm",
+               frequency="WEEKLY",
+               interval=2
+           )
+        """
+        credentials = get_credentials()
+        if not credentials:
+            return {
+                "success": False,
+                "error": "Not authenticated. Please authenticate first."
+            }
+
+        try:
+            # Build the recurrence rule
+            try:
+                rrule = build_rrule(
+                    frequency=frequency,
+                    interval=interval,
+                    count=count,
+                    until=until,
+                    by_day=by_day
+                )
+            except ValueError as e:
+                return {
+                    "success": False,
+                    "error": f"Invalid recurrence rule: {e}"
+                }
+
+            service = get_calendar_service(credentials)
+
+            if color_name:
+                color_id = get_color_id_from_name(color_name)
+            else:
+                color_id = "1"
+
+            # Create the base event object
+            event_body = create_calendar_event_object(
+                summary=summary,
+                start_time=start_time,
+                end_time=end_time,
+                description=description,
+                location=location,
+                attendees=attendees,
+                color_id=color_id
+            )
+
+            if "error" in event_body:
+                return {
+                    "success": False,
+                    "error": event_body["error"],
+                    "parsed_start": event_body.get("parsed_start"),
+                    "parsed_end": event_body.get("parsed_end")
+                }
+
+            # Add recurrence rule
+            event_body["recurrence"] = [rrule]
+
+            # Remove internal _parsed field before sending to API
+            event_body.pop("_parsed", None)
+
+            created_event = service.events().insert(calendarId="primary", body=event_body).execute()
+
+            event_id = created_event.get("id", "")
+            event_link = created_event.get("htmlLink", "")
+
+            return {
+                "success": True,
+                "message": "Recurring event created successfully.",
+                "event_id": event_id,
+                "event_link": event_link,
+                "recurrence": rrule,
+                "event_details": {
+                    "summary": summary,
+                    "frequency": frequency,
+                    "interval": interval,
+                    "count": count,
+                    "until": until,
+                    "by_day": by_day
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to create recurring event: {e}")
+            return {
+                "success": False,
+                "error": f"Failed to create recurring event: {e}"
             }
 
     @mcp.tool()

@@ -71,6 +71,94 @@ CALENDAR_COLOR_MAPPING = {
     "dark red": "11",
 }
 
+# Valid RRULE frequency values
+VALID_FREQUENCIES = ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]
+
+# Valid day abbreviations for BYDAY
+VALID_DAYS = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
+
+
+def build_rrule(
+    frequency: str,
+    interval: int = 1,
+    count: Optional[int] = None,
+    until: Optional[str] = None,
+    by_day: Optional[List[str]] = None
+) -> str:
+    """
+    Build an RRULE string for Google Calendar recurrence.
+
+    This function creates a valid RRULE string following RFC 5545 format.
+
+    Args:
+        frequency (str): Recurrence frequency - DAILY, WEEKLY, MONTHLY, or YEARLY
+        interval (int): How often the event repeats (e.g., 2 for every 2 weeks). Defaults to 1.
+        count (int, optional): Number of occurrences. Cannot be used with 'until'.
+        until (str, optional): End date for recurrence (YYYYMMDD format). Cannot be used with 'count'.
+        by_day (List[str], optional): Days of week for WEEKLY frequency (e.g., ["MO", "WE", "FR"])
+
+    Returns:
+        str: RRULE string (e.g., "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR")
+
+    Raises:
+        ValueError: If frequency is invalid or both count and until are provided
+
+    Examples:
+        >>> build_rrule("DAILY")
+        'RRULE:FREQ=DAILY'
+
+        >>> build_rrule("WEEKLY", by_day=["MO", "WE", "FR"])
+        'RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR'
+
+        >>> build_rrule("MONTHLY", interval=2, count=6)
+        'RRULE:FREQ=MONTHLY;INTERVAL=2;COUNT=6'
+
+        >>> build_rrule("YEARLY", until="20251231")
+        'RRULE:FREQ=YEARLY;UNTIL=20251231'
+    """
+    # Normalize frequency
+    freq = frequency.upper().strip()
+    if freq not in VALID_FREQUENCIES:
+        raise ValueError(f"Invalid frequency '{frequency}'. Must be one of: {', '.join(VALID_FREQUENCIES)}")
+
+    # Cannot have both count and until
+    if count is not None and until is not None:
+        raise ValueError("Cannot specify both 'count' and 'until'. Use one or the other.")
+
+    # Build RRULE parts
+    parts = [f"FREQ={freq}"]
+
+    # Add interval if > 1
+    if interval > 1:
+        parts.append(f"INTERVAL={interval}")
+
+    # Add by_day for weekly frequency
+    if by_day:
+        # Normalize and validate days
+        normalized_days = []
+        for day in by_day:
+            day_upper = day.upper().strip()
+            if day_upper not in VALID_DAYS:
+                raise ValueError(f"Invalid day '{day}'. Must be one of: {', '.join(VALID_DAYS)}")
+            normalized_days.append(day_upper)
+        parts.append(f"BYDAY={','.join(normalized_days)}")
+
+    # Add count or until
+    if count is not None:
+        if count < 1:
+            raise ValueError("Count must be at least 1")
+        parts.append(f"COUNT={count}")
+    elif until is not None:
+        # Normalize until date - remove dashes if present
+        until_normalized = until.replace("-", "")
+        # Validate format (should be YYYYMMDD)
+        if len(until_normalized) != 8 or not until_normalized.isdigit():
+            raise ValueError(f"Invalid until date '{until}'. Use YYYYMMDD or YYYY-MM-DD format.")
+        parts.append(f"UNTIL={until_normalized}")
+
+    return "RRULE:" + ";".join(parts)
+
+
 def get_color_id_from_name(color_name: str) -> str:
     """
     Get the color ID from a color name.
