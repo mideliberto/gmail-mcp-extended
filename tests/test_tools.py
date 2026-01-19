@@ -1,7 +1,15 @@
 """
-Tests for mcp/tools.py - Gmail tools
+Tests for mcp/tools - Gmail tools
 
 These tests mock the Gmail API to verify tool functionality.
+
+NOTE: After modular refactor, patches target specific modules:
+- Email read tools: gmail_mcp.mcp.tools.email_read
+- Email send tools: gmail_mcp.mcp.tools.email_send
+- Email manage tools: gmail_mcp.mcp.tools.email_manage
+- etc.
+
+Service mocks target: gmail_mcp.utils.services
 """
 
 import pytest
@@ -67,7 +75,7 @@ SAMPLE_LABEL_DETAIL = {
 
 
 def create_mock_gmail_service():
-    """Create a mock Gmail API service."""
+    """Create a mock Gmail API service with batch support."""
     service = MagicMock()
 
     # Mock users().messages().list()
@@ -76,7 +84,7 @@ def create_mock_gmail_service():
         "nextPageToken": "token123",
     }
 
-    # Mock users().messages().get()
+    # Mock users().messages().get() for single gets
     def mock_get_message(userId, id, format=None):
         mock = MagicMock()
         if id == "msg001":
@@ -88,6 +96,35 @@ def create_mock_gmail_service():
         return mock
 
     service.users().messages().get = mock_get_message
+
+    # Mock batch API for _batch_get_emails
+    def mock_batch_http_request(callback=None):
+        batch = MagicMock()
+        batch._requests = []
+        batch._callback = callback
+
+        def add_request(request, callback=None):
+            batch._requests.append((request, callback))
+
+        def execute_batch():
+            # Simulate batch execution by calling callbacks
+            for i, (request, cb) in enumerate(batch._requests):
+                # Get the message ID from the request
+                msg_id = f"msg00{i+1}"
+                if msg_id == "msg001":
+                    response = SAMPLE_MESSAGE
+                elif msg_id == "msg002":
+                    response = SAMPLE_MESSAGE_2
+                else:
+                    response = SAMPLE_MESSAGE
+                if cb:
+                    cb(str(i), response, None)
+
+        batch.add = add_request
+        batch.execute = execute_batch
+        return batch
+
+    service.new_batch_http_request = mock_batch_http_request
 
     # Mock users().getProfile()
     service.users().getProfile().execute.return_value = SAMPLE_PROFILE
@@ -104,9 +141,9 @@ def create_mock_gmail_service():
 class TestListEmails:
     """Tests for list_emails tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_list_emails_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.email_read.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_read.get_gmail_service")
+    def test_list_emails_success(self, mock_get_service, mock_get_credentials):
         """Test successful email listing."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
@@ -114,7 +151,7 @@ class TestListEmails:
         # Setup mocks
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         # Create MCP and setup tools
         mcp = FastMCP(name="Test")
@@ -146,7 +183,7 @@ class TestListEmails:
         assert email["from"] == "sender@example.com"
         assert "email_link" in email
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_read.get_credentials")
     def test_list_emails_not_authenticated(self, mock_get_credentials):
         """Test list_emails when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -172,16 +209,16 @@ class TestListEmails:
 class TestSearchEmails:
     """Tests for search_emails tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_search_emails_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.email_read.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_read.get_gmail_service")
+    def test_search_emails_success(self, mock_get_service, mock_get_credentials):
         """Test successful email search."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -202,7 +239,7 @@ class TestSearchEmails:
         assert result["query"] == "from:sender@example.com"
         assert len(result["emails"]) == 2
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_read.get_credentials")
     def test_search_emails_not_authenticated(self, mock_get_credentials):
         """Test search_emails when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -228,16 +265,16 @@ class TestSearchEmails:
 class TestGetEmail:
     """Tests for get_email tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_get_email_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.email_read.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_read.get_gmail_service")
+    def test_get_email_success(self, mock_get_service, mock_get_credentials):
         """Test successful email retrieval."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -259,7 +296,7 @@ class TestGetEmail:
         assert result["from"] == "sender@example.com"
         assert "email_link" in result
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_read.get_credentials")
     def test_get_email_not_authenticated(self, mock_get_credentials):
         """Test get_email when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -285,9 +322,9 @@ class TestGetEmail:
 class TestGetEmailOverview:
     """Tests for get_email_overview tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_get_email_overview_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.email_read.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_read.get_gmail_service")
+    def test_get_email_overview_success(self, mock_get_service, mock_get_credentials):
         """Test successful email overview retrieval."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
@@ -295,7 +332,7 @@ class TestGetEmailOverview:
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
         mock_service = create_mock_gmail_service()
-        mock_build.return_value = mock_service
+        mock_get_service.return_value = mock_service
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -319,7 +356,7 @@ class TestGetEmailOverview:
         assert result["account"]["email"] == "user@example.com"
         assert result["account"]["total_messages"] == 1000
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_read.get_credentials")
     def test_get_email_overview_not_authenticated(self, mock_get_credentials):
         """Test get_email_overview when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -345,16 +382,16 @@ class TestGetEmailOverview:
 class TestExtractEmailInfoIntegration:
     """Integration tests verifying extract_email_info is used correctly."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_list_emails_uses_helper(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.email_read.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_read.get_gmail_service")
+    def test_list_emails_uses_helper(self, mock_get_service, mock_get_credentials):
         """Verify list_emails uses extract_email_info helper."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -373,16 +410,16 @@ class TestExtractEmailInfoIntegration:
         for key in expected_keys:
             assert key in email, f"Missing key: {key}"
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_search_emails_uses_helper(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.email_read.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_read.get_gmail_service")
+    def test_search_emails_uses_helper(self, mock_get_service, mock_get_credentials):
         """Verify search_emails uses extract_email_info helper."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)

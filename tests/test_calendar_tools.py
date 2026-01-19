@@ -118,8 +118,8 @@ def create_mock_calendar_service():
 class TestCreateCalendarEvent:
     """Tests for create_calendar_event tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_calendar_service")
     @patch("gmail_mcp.calendar.processor.get_credentials")
     @patch("gmail_mcp.calendar.processor.build")
     def test_create_event_success(self, mock_proc_build, mock_proc_creds,
@@ -154,7 +154,7 @@ class TestCreateCalendarEvent:
 
         assert "error" not in result or result.get("success", False)
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
     def test_create_event_not_authenticated(self, mock_get_credentials):
         """Test create_calendar_event when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -183,16 +183,16 @@ class TestCreateCalendarEvent:
 class TestListCalendarEvents:
     """Tests for list_calendar_events tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_list_events_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_calendar_service")
+    def test_list_events_success(self, mock_get_service, mock_get_credentials):
         """Test successful event listing."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_calendar_service()
+        mock_get_service.return_value = create_mock_calendar_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -211,7 +211,7 @@ class TestListCalendarEvents:
         assert "events" in result
         assert len(result["events"]) == 2
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
     def test_list_events_not_authenticated(self, mock_get_credentials):
         """Test list_calendar_events when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -233,16 +233,16 @@ class TestListCalendarEvents:
         assert "error" in result
         assert "Not authenticated" in result["error"]
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_list_events_with_query(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_calendar_service")
+    def test_list_events_with_query(self, mock_get_service, mock_get_credentials):
         """Test listing events with search query."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_calendar_service()
+        mock_get_service.return_value = create_mock_calendar_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -262,16 +262,16 @@ class TestListCalendarEvents:
 class TestUpdateCalendarEvent:
     """Tests for update_calendar_event tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_update_event_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_calendar_service")
+    def test_update_event_success(self, mock_get_service, mock_get_credentials):
         """Test successful event update."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_calendar_service()
+        mock_get_service.return_value = create_mock_calendar_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -291,7 +291,7 @@ class TestUpdateCalendarEvent:
 
         assert "error" not in result
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
     def test_update_event_not_authenticated(self, mock_get_credentials):
         """Test update_calendar_event when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -317,16 +317,16 @@ class TestUpdateCalendarEvent:
 class TestDeleteCalendarEvent:
     """Tests for delete_calendar_event tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_delete_event_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_calendar_service")
+    def test_delete_event_success(self, mock_get_service, mock_get_credentials):
         """Test successful event deletion."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_calendar_service()
+        mock_get_service.return_value = create_mock_calendar_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -344,7 +344,7 @@ class TestDeleteCalendarEvent:
         assert "error" not in result
         assert result.get("success", False)
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
     def test_delete_event_not_authenticated(self, mock_get_credentials):
         """Test delete_calendar_event when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -370,16 +370,22 @@ class TestDeleteCalendarEvent:
 class TestRsvpEvent:
     """Tests for rsvp_event tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_rsvp_accepted(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_calendar_service")
+    @patch("gmail_mcp.mcp.tools.calendar.get_gmail_service")
+    def test_rsvp_accepted(self, mock_get_gmail_service, mock_get_service, mock_get_credentials):
         """Test RSVP with accepted response."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_calendar_service()
+        mock_get_service.return_value = create_mock_calendar_service()
+
+        # Mock Gmail service for user email lookup
+        gmail_service = MagicMock()
+        gmail_service.users().getProfile().execute.return_value = {"emailAddress": "user@example.com"}
+        mock_get_gmail_service.return_value = gmail_service
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -396,16 +402,22 @@ class TestRsvpEvent:
 
         assert "error" not in result
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_rsvp_declined(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_calendar_service")
+    @patch("gmail_mcp.mcp.tools.calendar.get_gmail_service")
+    def test_rsvp_declined(self, mock_get_gmail_service, mock_get_service, mock_get_credentials):
         """Test RSVP with declined response."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_calendar_service()
+        mock_get_service.return_value = create_mock_calendar_service()
+
+        # Mock Gmail service for user email lookup
+        gmail_service = MagicMock()
+        gmail_service.users().getProfile().execute.return_value = {"emailAddress": "user@example.com"}
+        mock_get_gmail_service.return_value = gmail_service
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -420,7 +432,7 @@ class TestRsvpEvent:
 
         assert "error" not in result
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
     def test_rsvp_not_authenticated(self, mock_get_credentials):
         """Test rsvp_event when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -448,8 +460,8 @@ class TestSuggestMeetingTimes:
 
     @patch("gmail_mcp.calendar.processor.get_credentials")
     @patch("gmail_mcp.calendar.processor.build")
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_calendar_service")
     def test_suggest_times_success(self, mock_build, mock_get_credentials,
                                     mock_proc_build, mock_proc_creds):
         """Test successful meeting time suggestions."""
@@ -488,7 +500,7 @@ class TestSuggestMeetingTimes:
         # The function should not error with valid credentials and date
         assert result.get("success", False) or "suggestions" in result
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
     def test_suggest_times_not_authenticated(self, mock_get_credentials):
         """Test suggest_meeting_times when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -517,9 +529,9 @@ class TestSuggestMeetingTimes:
 class TestDetectEventsFromEmail:
     """Tests for detect_events_from_email tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_detect_events_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_gmail_service")
+    def test_detect_events_success(self, mock_get_gmail_service, mock_get_credentials):
         """Test successful event detection from email."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
@@ -541,7 +553,7 @@ class TestDetectEventsFromEmail:
                 "body": {"data": "TGV0J3MgbWVldCBvbiBGcmlkYXkgYXQgM3Bt"}  # "Let's meet on Friday at 3pm"
             }
         }
-        mock_build.return_value = mock_service
+        mock_get_gmail_service.return_value = mock_service
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -559,7 +571,7 @@ class TestDetectEventsFromEmail:
         # Should not error
         assert "error" not in result or result.get("success", False)
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
     def test_detect_events_not_authenticated(self, mock_get_credentials):
         """Test detect_events_from_email when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools

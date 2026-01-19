@@ -1,10 +1,11 @@
-# Gmail MCP Server Configuration
+# Gmail MCP Server Configuration Example
+# Copy this file to config.yaml and customize
 
 # Server Configuration
 server:
   host: localhost
   port: 8000
-  debug: true  # Set to false in production
+  debug: false  # Set to true for development
   log_level: INFO
 
 # MCP Configuration
@@ -14,10 +15,10 @@ mcp:
   description: A Model Context Protocol server for Gmail and Calendar integration with Claude
 
 # Google OAuth Configuration
+# Note: client_id and client_secret should be set in Claude Desktop/Code config as env vars
 google:
-  # Sensitive data (client_id and client_secret) should be set in Claude Desktop config
   redirect_uri: http://localhost:8000/auth/callback
-  # Note: gmail.settings.basic enables filter management
+  # Required scopes - gmail.settings.basic enables filter management
   auth_scopes: https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/gmail.labels,https://www.googleapis.com/auth/gmail.modify,https://www.googleapis.com/auth/gmail.settings.basic,https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/calendar.events,https://www.googleapis.com/auth/userinfo.email,https://www.googleapis.com/auth/userinfo.profile,openid
 
 # Gmail API Configuration
@@ -26,29 +27,28 @@ gmail:
 
 # Calendar API Configuration
 calendar:
-  enabled: true
+  enabled: true  # Set to false to disable calendar features
   scopes: https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/calendar.events
 
 # Token Storage
 tokens:
-  storage_path: ~/gmail_mcp_tokens/tokens.json
-  # encryption_key should be set in Claude Desktop config
+  storage_path: ~/.gmail-mcp/tokens.json
+  # encryption_key should be set via TOKEN_ENCRYPTION_KEY env var in Claude config
 
-# Vault Integration (Obsidian or other note-taking system)
-# Configure these settings for email-to-vault functionality
+# Vault Integration (Obsidian or other markdown-based note system)
+# For email-to-vault functionality
 vault:
-  # Path to your Obsidian vault or note-taking directory
-  # Can also be set via VAULT_PATH environment variable
-  # path: ~/ObsidianVault
+  # Path to your vault - can also use VAULT_PATH env var
+  # path: /path/to/your/vault
 
-  # Default inbox folder for saved emails (relative to vault path)
+  # Folder for saved emails (relative to vault path)
   inbox_folder: 0-inbox
 
-  # Folder for email attachments (relative to inbox folder)
+  # Folder for attachments (relative to inbox folder)
   attachment_folder: attachments
 
 # Claude Review Labels
-# Labels created by setup_claude_review_labels() for email triage
+# Created by setup_claude_review_labels() for email triage workflows
 claude_review:
   labels:
     - name: Claude/Review
@@ -56,13 +56,13 @@ claude_review:
       description: General review needed
     - name: Claude/Urgent
       color: "#cc3a21"
-      description: Urgent review needed
+      description: Urgent - needs immediate attention
     - name: Claude/Reply-Needed
       color: "#16a765"
       description: Needs a reply drafted
     - name: Claude/Summarize
       color: "#ffad47"
-      description: Needs summarization
+      description: Long email needing summarization
     - name: Claude/Action-Required
       color: "#a479e2"
-      description: Has action items to extract
+      description: Contains action items to extract

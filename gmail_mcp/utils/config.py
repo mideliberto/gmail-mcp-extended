@@ -53,7 +53,7 @@ def get_config() -> Dict[str, Any]:
 
     # Load configuration from YAML file
     yaml_config = load_yaml_config()
-    
+
     # Extract nested values from YAML config
     server_config = yaml_config.get("server", {})
     mcp_config = yaml_config.get("mcp", {})
@@ -61,6 +61,8 @@ def get_config() -> Dict[str, Any]:
     gmail_config = yaml_config.get("gmail", {})
     calendar_config = yaml_config.get("calendar", {})
     tokens_config = yaml_config.get("tokens", {})
+    vault_config = yaml_config.get("vault", {})
+    claude_review_config = yaml_config.get("claude_review", {})
     
     # Helper function to safely split strings
     def safe_split(value: Optional[str], delimiter: str = ",") -> List[str]:
@@ -104,6 +106,14 @@ def get_config() -> Dict[str, Any]:
         # Token storage configuration (path from YAML, encryption key from env vars)
         "token_storage_path": tokens_config.get("storage_path", "./tokens.json"),
         "token_encryption_key": os.getenv("TOKEN_ENCRYPTION_KEY", ""),
+
+        # Vault integration configuration
+        "vault_path": vault_config.get("path") or os.getenv("VAULT_PATH", ""),
+        "vault_inbox_folder": vault_config.get("inbox_folder", "0-inbox"),
+        "vault_attachment_folder": vault_config.get("attachment_folder", "attachments"),
+
+        # Claude review labels configuration
+        "claude_review_labels": claude_review_config.get("labels", []),
     }
 
     # Cache the config

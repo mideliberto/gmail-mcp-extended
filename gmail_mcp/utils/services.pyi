@@ -1,0 +1,9 @@
+"""Type stubs for services module."""
+
+from typing import Optional
+from googleapiclient.discovery import Resource
+from google.oauth2.credentials import Credentials
+
+def get_gmail_service(credentials: Credentials) -> Resource: ...
+def get_calendar_service(credentials: Credentials) -> Resource: ...
+def clear_service_cache() -> None: ...

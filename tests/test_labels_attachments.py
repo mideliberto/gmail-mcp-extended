@@ -82,16 +82,16 @@ def create_mock_gmail_service():
 class TestListLabels:
     """Tests for list_labels tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_list_labels_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.labels.get_credentials")
+    @patch("gmail_mcp.mcp.tools.labels.get_gmail_service")
+    def test_list_labels_success(self, mock_get_service, mock_get_credentials):
         """Test successful label listing."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -110,7 +110,7 @@ class TestListLabels:
         assert "labels" in result
         assert len(result["labels"]) == 4
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.labels.get_credentials")
     def test_list_labels_not_authenticated(self, mock_get_credentials):
         """Test list_labels when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -136,16 +136,16 @@ class TestListLabels:
 class TestCreateLabel:
     """Tests for create_label tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_create_label_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.labels.get_credentials")
+    @patch("gmail_mcp.mcp.tools.labels.get_gmail_service")
+    def test_create_label_success(self, mock_get_service, mock_get_credentials):
         """Test successful label creation."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -162,7 +162,7 @@ class TestCreateLabel:
 
         assert "error" not in result
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.labels.get_credentials")
     def test_create_label_not_authenticated(self, mock_get_credentials):
         """Test create_label when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -188,16 +188,16 @@ class TestCreateLabel:
 class TestApplyLabel:
     """Tests for apply_label tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_apply_label_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.labels.get_credentials")
+    @patch("gmail_mcp.mcp.tools.labels.get_gmail_service")
+    def test_apply_label_success(self, mock_get_service, mock_get_credentials):
         """Test successful label application."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -215,7 +215,7 @@ class TestApplyLabel:
         assert "error" not in result
         assert result.get("success", False)
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.labels.get_credentials")
     def test_apply_label_not_authenticated(self, mock_get_credentials):
         """Test apply_label when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -241,16 +241,16 @@ class TestApplyLabel:
 class TestRemoveLabel:
     """Tests for remove_label tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_remove_label_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.labels.get_credentials")
+    @patch("gmail_mcp.mcp.tools.labels.get_gmail_service")
+    def test_remove_label_success(self, mock_get_service, mock_get_credentials):
         """Test successful label removal."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -268,7 +268,7 @@ class TestRemoveLabel:
         assert "error" not in result
         assert result.get("success", False)
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.labels.get_credentials")
     def test_remove_label_not_authenticated(self, mock_get_credentials):
         """Test remove_label when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -294,16 +294,16 @@ class TestRemoveLabel:
 class TestGetAttachments:
     """Tests for get_attachments tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_get_attachments_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.attachments.get_credentials")
+    @patch("gmail_mcp.mcp.tools.attachments.get_gmail_service")
+    def test_get_attachments_success(self, mock_get_service, mock_get_credentials):
         """Test successful attachment listing."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -322,7 +322,7 @@ class TestGetAttachments:
         assert "attachments" in result
         assert len(result["attachments"]) == 2  # Two attachments in mock
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.attachments.get_credentials")
     def test_get_attachments_not_authenticated(self, mock_get_credentials):
         """Test get_attachments when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -348,16 +348,16 @@ class TestGetAttachments:
 class TestDownloadAttachment:
     """Tests for download_attachment tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_download_attachment_success(self, mock_build, mock_get_credentials, tmp_path):
+    @patch("gmail_mcp.mcp.tools.attachments.get_credentials")
+    @patch("gmail_mcp.mcp.tools.attachments.get_gmail_service")
+    def test_download_attachment_success(self, mock_get_service, mock_get_credentials, tmp_path):
         """Test successful attachment download."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -380,7 +380,7 @@ class TestDownloadAttachment:
         assert "error" not in result
         assert result.get("success", False)
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.attachments.get_credentials")
     def test_download_attachment_not_authenticated(self, mock_get_credentials, tmp_path):
         """Test download_attachment when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools

@@ -1,7 +1,12 @@
 """
-Tests for mcp/tools.py - Bulk operations and email reply tools
+Tests for mcp/tools - Bulk operations and email reply tools
 
 Tests for bulk archive/label/trash and email reply functionality.
+
+NOTE: After modular refactor, patches target specific modules:
+- Bulk tools: gmail_mcp.mcp.tools.bulk
+- Email send tools: gmail_mcp.mcp.tools.email_send
+- Services: gmail_mcp.utils.services
 """
 
 import pytest
@@ -84,22 +89,41 @@ def create_mock_gmail_service():
         "emailAddress": "user@example.com",
     }
 
+    # Mock batch API
+    def mock_batch_http_request(callback=None):
+        batch = MagicMock()
+        batch._requests = []
+
+        def add_request(request, callback=None):
+            batch._requests.append((request, callback))
+
+        def execute_batch():
+            for i, (request, cb) in enumerate(batch._requests):
+                if cb:
+                    cb(str(i), {"id": f"msg00{i+1}"}, None)
+
+        batch.add = add_request
+        batch.execute = execute_batch
+        return batch
+
+    service.new_batch_http_request = mock_batch_http_request
+
     return service
 
 
 class TestBulkArchive:
     """Tests for bulk_archive tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_bulk_archive_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.bulk.get_credentials")
+    @patch("gmail_mcp.mcp.tools.bulk.get_gmail_service")
+    def test_bulk_archive_success(self, mock_get_service, mock_get_credentials):
         """Test successful bulk archive."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -117,7 +141,7 @@ class TestBulkArchive:
         assert "error" not in result
         assert result.get("success", False) or "archived" in result
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.bulk.get_credentials")
     def test_bulk_archive_not_authenticated(self, mock_get_credentials):
         """Test bulk_archive when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -143,16 +167,16 @@ class TestBulkArchive:
 class TestBulkLabel:
     """Tests for bulk_label tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_bulk_label_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.bulk.get_credentials")
+    @patch("gmail_mcp.mcp.tools.bulk.get_gmail_service")
+    def test_bulk_label_success(self, mock_get_service, mock_get_credentials):
         """Test successful bulk labeling."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -170,7 +194,7 @@ class TestBulkLabel:
         assert "error" not in result
         assert result.get("success", False) or "labeled" in result
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.bulk.get_credentials")
     def test_bulk_label_not_authenticated(self, mock_get_credentials):
         """Test bulk_label when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -196,16 +220,16 @@ class TestBulkLabel:
 class TestBulkTrash:
     """Tests for bulk_trash tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_bulk_trash_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.bulk.get_credentials")
+    @patch("gmail_mcp.mcp.tools.bulk.get_gmail_service")
+    def test_bulk_trash_success(self, mock_get_service, mock_get_credentials):
         """Test successful bulk trash."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -223,7 +247,7 @@ class TestBulkTrash:
         assert "error" not in result
         assert result.get("success", False) or "trashed" in result
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.bulk.get_credentials")
     def test_bulk_trash_not_authenticated(self, mock_get_credentials):
         """Test bulk_trash when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -249,16 +273,16 @@ class TestBulkTrash:
 class TestPrepareEmailReply:
     """Tests for prepare_email_reply tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_prepare_reply_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.email_send.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_send.get_gmail_service")
+    def test_prepare_reply_success(self, mock_get_service, mock_get_credentials):
         """Test successful reply preparation."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -276,7 +300,7 @@ class TestPrepareEmailReply:
         assert "error" not in result
         assert "original_email" in result
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_send.get_credentials")
     def test_prepare_reply_not_authenticated(self, mock_get_credentials):
         """Test prepare_email_reply when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -302,16 +326,16 @@ class TestPrepareEmailReply:
 class TestSendEmailReply:
     """Tests for send_email_reply tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_send_reply_creates_draft(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.email_send.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_send.get_gmail_service")
+    def test_send_reply_creates_draft(self, mock_get_service, mock_get_credentials):
         """Test that send_email_reply creates a draft (requires confirmation)."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -334,7 +358,7 @@ class TestSendEmailReply:
         assert "draft_id" in result
         assert result.get("confirmation_required", False)
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_send.get_credentials")
     def test_send_reply_not_authenticated(self, mock_get_credentials):
         """Test send_email_reply when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -363,16 +387,16 @@ class TestSendEmailReply:
 class TestConfirmSendEmail:
     """Tests for confirm_send_email tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_confirm_send_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.email_send.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_send.get_gmail_service")
+    def test_confirm_send_success(self, mock_get_service, mock_get_credentials):
         """Test successful email sending after confirmation."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
 
         mock_credentials = Mock()
         mock_get_credentials.return_value = mock_credentials
-        mock_build.return_value = create_mock_gmail_service()
+        mock_get_service.return_value = create_mock_gmail_service()
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -390,7 +414,7 @@ class TestConfirmSendEmail:
         assert "error" not in result
         assert result.get("success", False)
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_send.get_credentials")
     def test_confirm_send_not_authenticated(self, mock_get_credentials):
         """Test confirm_send_email when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools
@@ -416,9 +440,9 @@ class TestConfirmSendEmail:
 class TestFindUnsubscribeLink:
     """Tests for find_unsubscribe_link tool."""
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
-    @patch("gmail_mcp.mcp.tools.build")
-    def test_find_unsubscribe_success(self, mock_build, mock_get_credentials):
+    @patch("gmail_mcp.mcp.tools.bulk.get_credentials")
+    @patch("gmail_mcp.mcp.tools.bulk.get_gmail_service")
+    def test_find_unsubscribe_success(self, mock_get_service, mock_get_credentials):
         """Test successful unsubscribe link finding."""
         from gmail_mcp.mcp.tools import setup_tools
         from mcp.server.fastmcp import FastMCP
@@ -437,7 +461,7 @@ class TestFindUnsubscribeLink:
                 ],
             },
         }
-        mock_build.return_value = mock_service
+        mock_get_service.return_value = mock_service
 
         mcp = FastMCP(name="Test")
         setup_tools(mcp)
@@ -454,7 +478,7 @@ class TestFindUnsubscribeLink:
 
         assert "error" not in result
 
-    @patch("gmail_mcp.mcp.tools.get_credentials")
+    @patch("gmail_mcp.mcp.tools.bulk.get_credentials")
     def test_find_unsubscribe_not_authenticated(self, mock_get_credentials):
         """Test find_unsubscribe_link when not authenticated."""
         from gmail_mcp.mcp.tools import setup_tools

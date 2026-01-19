@@ -1,0 +1,6 @@
+"""Type stubs for gmail helpers module."""
+
+from typing import Dict, Any
+
+def extract_email_info(msg: Dict[str, Any]) -> Dict[str, Any]: ...
+def extract_headers(msg: Dict[str, Any]) -> Dict[str, str]: ...
