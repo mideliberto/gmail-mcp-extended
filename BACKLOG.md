@@ -19,7 +19,7 @@
 
 | Priority | Items |
 |----------|-------|
-| **High** | Thread View, Draft Management, Scheduled Send, Bulk Operations Bug |
+| **High** | Draft Management, Scheduled Send |
 | **Medium** | Retention Labels, Unsubscribe Management, Attendee Free/Busy, Contact Lookup, Event Reminders |
 | **Low** | Vacation Responder, Travel Time, DST Handling |
 | **Future** | Google Drive Integration |
@@ -28,43 +28,16 @@
 
 ## Bugs
 
-### 20. Bulk Operations Capped at 20 Emails 🐛 HIGH PRIORITY
-**Priority:** High
-**Issue:** All bulk operations ignore `max_emails` parameter and cap at 20 emails per call.
+### 20. ✅ FIXED - Bulk Operations Capped at 20 Emails (2026-01-19)
+Added `_fetch_messages_with_pagination()` helper that loops through pages using `nextPageToken`.
+All bulk operations now properly fetch up to `max_emails` (increased max from 100 to 500):
+- `bulk_trash(query, max_emails)` - now paginates correctly
+- `bulk_archive(query, max_emails)` - now paginates correctly
+- `bulk_label(query, label_id, max_emails)` - now paginates correctly
+- `cleanup_old_emails(query, days_old, action, max_emails)` - now paginates correctly
 
-**Affected functions:**
-- `bulk_trash(query, max_emails)` - always processes only 20
-- `bulk_archive(query, max_emails)` - always processes only 20
-- `bulk_label(query, label_id, max_emails)` - always processes only 20
-- `cleanup_old_emails(query, days_old, action, max_emails)` - always processes only 20
-
-**Current behavior:**
-```python
-bulk_trash(query="label:Dice older_than:7d", max_emails=100)
-# Returns: {"trashed": 20, "failed": 80}  # Only 20 processed regardless
-```
-
-**Expected behavior:**
-- Should loop through all matching emails up to `max_emails`
-- Or process in batches of 20 until done
-- Return accurate count of processed emails
-
-**Root cause:** Likely missing pagination loop in bulk operation functions.
-
-**Fix approach:**
-1. Audit ALL batched/looped operations in the codebase (not just bulk_*)
-2. Find where pagination is handled
-3. Ensure loop continues until:
-   - All matching emails processed, OR
-   - `max_emails` limit reached, OR
-   - No more results (next_page_token is None)
-
-**Files to check:**
-- `gmail_mcp/mcp/tools/email_manage.py` (bulk_trash, bulk_archive, bulk_label)
-- `gmail_mcp/mcp/tools/email_read.py` (cleanup_old_emails)
-- Any other function that processes multiple items in batches
-
-**Estimated scope:** ~50-100 lines to fix across multiple files
+**Files changed:**
+- `gmail_mcp/mcp/tools/bulk.py` - added pagination helper, updated all 4 functions
 
 ---
 
@@ -77,72 +50,25 @@ Added `gmail.settings.basic` scope to `oauth.py`. User must re-auth after upgrad
 
 ## Email Features
 
-### 11. Thread/Conversation View ⭐ HIGH PRIORITY
-**Priority:** High
-**Issue:** `get_email()` returns single message, not full conversation context.
+### 11. ✅ IMPLEMENTED - Thread/Conversation View (2026-01-19)
+Implemented full thread/conversation view support with three new tools:
 
-**Current behavior:**
-```python
-get_email(email_id="...")  # Returns single message only
-```
+**New tools:**
+- `get_thread(thread_id)` - Returns full conversation with all messages
+- `get_thread_summary(thread_id)` - Returns condensed view (original, timeline, recent messages)
+- `get_email(email_id, include_thread=True)` - Option to include thread context
 
-**Desired behavior:**
-```python
-get_thread(thread_id="...")  # Returns full conversation
-get_email(email_id="...", include_thread=True)  # Option to include thread context
-```
-
-**Use cases:**
-- Understanding full context before replying
-- Seeing what was already discussed
-- Finding specific info buried in long email chains
-
-**Game Plan:**
-
-1. **Phase 1: Core Thread Retrieval**
-   - New file: `gmail_mcp/mcp/tools/email_thread.py`
-   - New function: `get_thread(thread_id: str) -> Dict`
-   - Uses Gmail API `threads().get()` with `format=full`
-   - Returns:
-     ```json
-     {
-       "thread_id": "...",
-       "subject": "Re: Project Update",
-       "message_count": 5,
-       "participants": ["alice@co.com", "bob@co.com"],
-       "messages": [
-         {"id": "...", "from": "...", "date": "...", "snippet": "...", "body": "..."},
-         ...
-       ],
-       "thread_link": "https://mail.google.com/mail/u/0/#inbox/..."
-     }
-     ```
-
-2. **Phase 2: Smart Summarization**
-   - Add `get_thread_summary(thread_id: str) -> Dict`
-   - Returns condensed view for long threads:
-     - First message (original)
-     - Key participants
-     - Timeline of replies
-     - Last 2-3 messages in full
-     - Total message count
-
-3. **Phase 3: Integration**
-   - Update `get_email()` to accept `include_thread: bool = False`
-   - Update `prepare_email_reply()` to use thread context
-   - Update `list_emails()` to include `thread_id` in results (already does via Gmail API)
+**Features:**
+- Full message bodies extracted
+- Participant extraction from from/to/cc fields
+- Chronological message ordering
+- Direct Gmail web links
 
 **Files:**
-- `gmail_mcp/mcp/tools/email_thread.py` (new)
-- `gmail_mcp/mcp/tools/email_read.py` (update get_email)
-- `gmail_mcp/mcp/tools/email_compose.py` (update prepare_email_reply)
-- `tests/test_email_thread.py` (new)
-
-**API Reference:**
-- `threads().get(userId, id, format)` - https://developers.google.com/gmail/api/reference/rest/v1/users.threads/get
-- `threads().list(userId, q)` - https://developers.google.com/gmail/api/reference/rest/v1/users.threads/list
-
-**Estimated scope:** ~200 lines code, ~100 lines tests
+- `gmail_mcp/mcp/tools/email_thread.py` (new - ~220 lines)
+- `gmail_mcp/mcp/tools/email_read.py` (updated get_email with include_thread)
+- `gmail_mcp/mcp/tools/__init__.py` (registered new module)
+- `tests/test_email_thread.py` (new - 9 tests)
 
 ---
 
@@ -740,9 +666,9 @@ tests/
 
 ## Test Baseline
 
-As of 2026-01-19 (post-backlog):
+As of 2026-01-19 (post-thread-view & bulk-fix):
 ```
-264 passed, 4 warnings
+273 passed, 4 warnings
 ```
 
 Warnings are dateparser deprecation notices (upstream issue, not actionable).

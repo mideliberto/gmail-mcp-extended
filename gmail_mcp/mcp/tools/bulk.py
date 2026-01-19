@@ -6,7 +6,7 @@ Handles bulk email operations: archive, label, trash with batch API support.
 
 import re
 import base64
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from mcp.server.fastmcp import FastMCP
 
@@ -15,6 +15,57 @@ from gmail_mcp.utils.services import get_gmail_service
 from gmail_mcp.auth.oauth import get_credentials
 
 logger = get_logger(__name__)
+
+
+def _fetch_messages_with_pagination(
+    service,
+    query: str,
+    max_messages: int
+) -> List[Dict[str, Any]]:
+    """
+    Fetch messages matching a query with pagination support.
+
+    Continues fetching pages until we have max_messages or no more results.
+
+    Args:
+        service: Gmail API service instance
+        query: Gmail search query
+        max_messages: Maximum number of messages to fetch
+
+    Returns:
+        List of message dicts with 'id' keys
+    """
+    messages = []
+    page_token: Optional[str] = None
+
+    while len(messages) < max_messages:
+        # Request only what we still need (up to 100 per page, API limit)
+        remaining = max_messages - len(messages)
+        page_size = min(remaining, 100)
+
+        request_params = {
+            "userId": "me",
+            "q": query,
+            "maxResults": page_size
+        }
+        if page_token:
+            request_params["pageToken"] = page_token
+
+        result = service.users().messages().list(**request_params).execute()
+
+        page_messages = result.get("messages", [])
+        if not page_messages:
+            break
+
+        messages.extend(page_messages)
+
+        # Check if there are more pages
+        page_token = result.get("nextPageToken")
+        if not page_token:
+            break
+
+    # Return only up to max_messages (in case last page pushed us over)
+    return messages[:max_messages]
 
 
 def setup_bulk_tools(mcp: FastMCP) -> None:
@@ -29,7 +80,7 @@ def setup_bulk_tools(mcp: FastMCP) -> None:
 
         Args:
             query (str): Gmail search query (e.g., "from:newsletter@example.com")
-            max_emails (int): Maximum number of emails to archive (default 50, max 100)
+            max_emails (int): Maximum number of emails to archive (default 50, max 500)
 
         Returns:
             Dict[str, Any]: Results of the bulk operation
@@ -41,15 +92,10 @@ def setup_bulk_tools(mcp: FastMCP) -> None:
 
         try:
             service = get_gmail_service(credentials)
-            max_emails = min(max_emails, 100)
+            max_emails = min(max_emails, 500)
 
-            result = service.users().messages().list(
-                userId="me",
-                q=query,
-                maxResults=max_emails
-            ).execute()
-
-            messages = result.get("messages", [])
+            # Use pagination to fetch up to max_emails
+            messages = _fetch_messages_with_pagination(service, query, max_emails)
 
             if not messages:
                 return {
@@ -89,7 +135,7 @@ def setup_bulk_tools(mcp: FastMCP) -> None:
         Args:
             query (str): Gmail search query
             label_id (str): The label ID to apply
-            max_emails (int): Maximum number of emails to label (default 50, max 100)
+            max_emails (int): Maximum number of emails to label (default 50, max 500)
 
         Returns:
             Dict[str, Any]: Results of the bulk operation
@@ -101,15 +147,10 @@ def setup_bulk_tools(mcp: FastMCP) -> None:
 
         try:
             service = get_gmail_service(credentials)
-            max_emails = min(max_emails, 100)
+            max_emails = min(max_emails, 500)
 
-            result = service.users().messages().list(
-                userId="me",
-                q=query,
-                maxResults=max_emails
-            ).execute()
-
-            messages = result.get("messages", [])
+            # Use pagination to fetch up to max_emails
+            messages = _fetch_messages_with_pagination(service, query, max_emails)
 
             if not messages:
                 return {
@@ -150,7 +191,7 @@ def setup_bulk_tools(mcp: FastMCP) -> None:
 
         Args:
             query (str): Gmail search query
-            max_emails (int): Maximum number of emails to trash (default 50, max 100)
+            max_emails (int): Maximum number of emails to trash (default 50, max 500)
 
         Returns:
             Dict[str, Any]: Results of the bulk operation
@@ -162,15 +203,10 @@ def setup_bulk_tools(mcp: FastMCP) -> None:
 
         try:
             service = get_gmail_service(credentials)
-            max_emails = min(max_emails, 100)
+            max_emails = min(max_emails, 500)
 
-            result = service.users().messages().list(
-                userId="me",
-                q=query,
-                maxResults=max_emails
-            ).execute()
-
-            messages = result.get("messages", [])
+            # Use pagination to fetch up to max_emails
+            messages = _fetch_messages_with_pagination(service, query, max_emails)
 
             if not messages:
                 return {
@@ -284,7 +320,7 @@ def setup_bulk_tools(mcp: FastMCP) -> None:
             query (str): Base Gmail search query (e.g., "from:newsletter@example.com")
             days_old (int): Only process emails older than this many days (default: 30)
             action (str): Action to take - "archive" or "trash" (default: "archive")
-            max_emails (int): Maximum number of emails to process (default: 100)
+            max_emails (int): Maximum number of emails to process (default: 100, max 500)
 
         Returns:
             Dict[str, Any]: Results of the cleanup operation
@@ -299,17 +335,13 @@ def setup_bulk_tools(mcp: FastMCP) -> None:
 
         try:
             service = get_gmail_service(credentials)
+            max_emails = min(max_emails, 500)
 
             # Build query with age filter
             full_query = f"{query} older_than:{days_old}d"
 
-            result = service.users().messages().list(
-                userId="me",
-                q=full_query,
-                maxResults=min(max_emails, 100)
-            ).execute()
-
-            messages = result.get("messages", [])
+            # Use pagination to fetch up to max_emails
+            messages = _fetch_messages_with_pagination(service, full_query, max_emails)
 
             if not messages:
                 return {

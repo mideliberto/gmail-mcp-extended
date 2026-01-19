@@ -9,6 +9,7 @@ Tools are organized into the following modules:
 - email_read: Reading emails (list, search, get, overview)
 - email_send: Sending emails (compose, reply, forward, confirm_send)
 - email_manage: Managing emails (archive, trash, delete, star, read/unread)
+- email_thread: Thread/conversation view (get_thread, get_thread_summary)
 - labels: Label management (list, create, delete, apply, remove, Claude review labels)
 - attachments: Attachment handling (list, download)
 - bulk: Bulk operations (bulk_archive, bulk_label, bulk_trash, cleanup_old_emails)
@@ -24,6 +25,7 @@ from gmail_mcp.mcp.tools.auth import setup_auth_tools
 from gmail_mcp.mcp.tools.email_read import setup_email_read_tools
 from gmail_mcp.mcp.tools.email_send import setup_email_send_tools
 from gmail_mcp.mcp.tools.email_manage import setup_email_manage_tools
+from gmail_mcp.mcp.tools.email_thread import setup_email_thread_tools
 from gmail_mcp.mcp.tools.labels import setup_label_tools
 from gmail_mcp.mcp.tools.attachments import setup_attachment_tools
 from gmail_mcp.mcp.tools.bulk import setup_bulk_tools
@@ -44,6 +46,7 @@ def setup_tools(mcp: FastMCP) -> None:
     setup_email_read_tools(mcp)
     setup_email_send_tools(mcp)
     setup_email_manage_tools(mcp)
+    setup_email_thread_tools(mcp)
     setup_label_tools(mcp)
     setup_attachment_tools(mcp)
     setup_bulk_tools(mcp)
@@ -59,6 +62,7 @@ __all__ = [
     "setup_email_read_tools",
     "setup_email_send_tools",
     "setup_email_manage_tools",
+    "setup_email_thread_tools",
     "setup_label_tools",
     "setup_attachment_tools",
     "setup_bulk_tools",

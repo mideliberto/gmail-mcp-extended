@@ -123,7 +123,7 @@ def setup_email_read_tools(mcp: FastMCP) -> None:
             return {"success": False, "error": f"Failed to list emails: {error}"}
 
     @mcp.tool()
-    def get_email(email_id: str) -> Dict[str, Any]:
+    def get_email(email_id: str, include_thread: bool = False) -> Dict[str, Any]:
         """
         Get a specific email by ID.
 
@@ -137,6 +137,8 @@ def setup_email_read_tools(mcp: FastMCP) -> None:
         Args:
             email_id (str): The ID of the email to retrieve. This ID comes from the
                             list_emails() or search_emails() results.
+            include_thread (bool): If True, also fetches the full thread context.
+                                   Defaults to False for backward compatibility.
 
         Returns:
             Dict[str, Any]: The email details including:
@@ -151,13 +153,18 @@ def setup_email_read_tools(mcp: FastMCP) -> None:
                 - snippet: Short snippet of the email
                 - labels: Email labels
                 - email_link: Direct link to the email in Gmail web interface
+                - thread: (only if include_thread=True) Full thread context with:
+                    - message_count: Number of messages in thread
+                    - participants: List of unique email addresses
+                    - messages: All messages in chronological order
 
         Example usage:
         1. First check authentication: access auth://status resource
         2. Get a list of emails: list_emails()
         3. Extract an email ID from the results
         4. Get the full email: get_email(email_id="...")
-        5. Always include the email_link when discussing the email with the user
+        5. Get email with thread context: get_email(email_id="...", include_thread=True)
+        6. Always include the email_link when discussing the email with the user
         """
         credentials = get_credentials()
 
@@ -187,7 +194,7 @@ def setup_email_read_tools(mcp: FastMCP) -> None:
             thread_id = msg["threadId"]
             email_link = f"https://mail.google.com/mail/u/0/#inbox/{thread_id}/{email_id}"
 
-            return {
+            result = {
                 "id": msg["id"],
                 "thread_id": thread_id,
                 "subject": headers.get("subject", "No Subject"),
@@ -200,6 +207,14 @@ def setup_email_read_tools(mcp: FastMCP) -> None:
                 "labels": msg["labelIds"],
                 "email_link": email_link
             }
+
+            # Optionally include thread context
+            if include_thread:
+                thread_data = _get_thread_context(service, thread_id)
+                if thread_data:
+                    result["thread"] = thread_data
+
+            return result
         except HttpError as error:
             logger.error(f"Failed to get email: {error}")
             return {"success": False, "error": f"Failed to get email: {error}"}
@@ -384,6 +399,80 @@ def setup_email_read_tools(mcp: FastMCP) -> None:
         except Exception as e:
             logger.error(f"Failed to get email overview: {e}")
             return {"success": False, "error": f"Failed to get email overview: {e}"}
+
+
+def _get_thread_context(service, thread_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Get thread context for an email.
+
+    Args:
+        service: Gmail API service instance
+        thread_id: The thread ID to fetch
+
+    Returns:
+        Dict with thread context or None on error
+    """
+    try:
+        thread = service.users().threads().get(
+            userId="me",
+            id=thread_id,
+            format="full"
+        ).execute()
+
+        messages = thread.get("messages", [])
+
+        if not messages:
+            return None
+
+        # Extract messages
+        extracted_messages = []
+        participants = set()
+
+        for msg in messages:
+            headers = {h["name"].lower(): h["value"] for h in msg.get("payload", {}).get("headers", [])}
+
+            # Extract body
+            body = ""
+            payload = msg.get("payload", {})
+            if "parts" in payload:
+                for part in payload["parts"]:
+                    if part.get("mimeType") == "text/plain" and "data" in part.get("body", {}):
+                        body = base64.urlsafe_b64decode(part["body"]["data"]).decode("utf-8")
+                        break
+            elif "body" in payload and "data" in payload["body"]:
+                body = base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8")
+
+            extracted_messages.append({
+                "id": msg["id"],
+                "from": headers.get("from", "Unknown"),
+                "to": headers.get("to", "Unknown"),
+                "cc": headers.get("cc", ""),
+                "date": headers.get("date", "Unknown"),
+                "subject": headers.get("subject", "No Subject"),
+                "snippet": msg.get("snippet", ""),
+                "body": body
+            })
+
+            # Collect participants
+            for field in ["from", "to", "cc"]:
+                value = headers.get(field, "")
+                if value:
+                    for addr in value.split(","):
+                        addr = addr.strip()
+                        if "<" in addr and ">" in addr:
+                            addr = addr[addr.index("<") + 1:addr.index(">")]
+                        if addr and "@" in addr:
+                            participants.add(addr.lower())
+
+        return {
+            "message_count": len(extracted_messages),
+            "participants": sorted(list(participants)),
+            "messages": extracted_messages
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get thread context: {e}")
+        return None
 
 
 def _batch_get_emails(service, message_ids: list) -> list:
