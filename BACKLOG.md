@@ -19,10 +19,52 @@
 
 | Priority | Items |
 |----------|-------|
-| **High** | Thread View, Draft Management, Scheduled Send |
+| **High** | Thread View, Draft Management, Scheduled Send, Bulk Operations Bug |
 | **Medium** | Attendee Free/Busy, Contact Lookup, Event Reminders |
 | **Low** | Vacation Responder, Travel Time, DST Handling |
 | **Future** | Google Drive Integration |
+
+---
+
+## Bugs
+
+### 20. Bulk Operations Capped at 20 Emails 🐛 HIGH PRIORITY
+**Priority:** High
+**Issue:** All bulk operations ignore `max_emails` parameter and cap at 20 emails per call.
+
+**Affected functions:**
+- `bulk_trash(query, max_emails)` - always processes only 20
+- `bulk_archive(query, max_emails)` - always processes only 20
+- `bulk_label(query, label_id, max_emails)` - always processes only 20
+- `cleanup_old_emails(query, days_old, action, max_emails)` - always processes only 20
+
+**Current behavior:**
+```python
+bulk_trash(query="label:Dice older_than:7d", max_emails=100)
+# Returns: {"trashed": 20, "failed": 80}  # Only 20 processed regardless
+```
+
+**Expected behavior:**
+- Should loop through all matching emails up to `max_emails`
+- Or process in batches of 20 until done
+- Return accurate count of processed emails
+
+**Root cause:** Likely missing pagination loop in bulk operation functions.
+
+**Fix approach:**
+1. Audit ALL batched/looped operations in the codebase (not just bulk_*)
+2. Find where pagination is handled
+3. Ensure loop continues until:
+   - All matching emails processed, OR
+   - `max_emails` limit reached, OR
+   - No more results (next_page_token is None)
+
+**Files to check:**
+- `gmail_mcp/mcp/tools/email_manage.py` (bulk_trash, bulk_archive, bulk_label)
+- `gmail_mcp/mcp/tools/email_read.py` (cleanup_old_emails)
+- Any other function that processes multiple items in batches
+
+**Estimated scope:** ~50-100 lines to fix across multiple files
 
 ---
 
