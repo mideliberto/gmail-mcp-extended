@@ -191,6 +191,63 @@ def setup_bulk_tools(mcp: FastMCP) -> None:
             return {"success": False, "error": f"Failed to bulk label: {e}"}
 
     @mcp.tool()
+    def bulk_remove_label(query: str, label_id: str, max_emails: int = 50) -> Dict[str, Any]:
+        """
+        Remove a label from all emails matching a search query.
+
+        Uses Gmail's batch API for efficient processing.
+
+        Args:
+            query (str): Gmail search query
+            label_id (str): The label ID to remove
+            max_emails (int): Maximum number of emails to process (default 50, max 500)
+
+        Returns:
+            Dict[str, Any]: Results of the bulk operation
+        """
+        credentials = get_credentials()
+
+        if not credentials:
+            return {"success": False, "error": "Not authenticated. Please use the authenticate tool first."}
+
+        try:
+            service = get_gmail_service(credentials)
+            max_emails = min(max_emails, 500)
+
+            # Use pagination to fetch up to max_emails
+            messages = _fetch_messages_with_pagination(service, query, max_emails)
+
+            if not messages:
+                return {
+                    "success": True,
+                    "message": "No emails found matching query.",
+                    "unlabeled": 0,
+                    "failed": 0,
+                    "query": query,
+                    "label_id": label_id
+                }
+
+            # Use batch API for efficient processing
+            unlabeled, failed = _batch_modify_emails(
+                service,
+                [m["id"] for m in messages],
+                remove_labels=[label_id]
+            )
+
+            return {
+                "success": True,
+                "message": f"Removed label from {unlabeled} emails.",
+                "unlabeled": unlabeled,
+                "failed": failed,
+                "query": query,
+                "label_id": label_id
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to bulk remove label: {e}")
+            return {"success": False, "error": f"Failed to bulk remove label: {e}"}
+
+    @mcp.tool()
     def bulk_trash(query: str, max_emails: int = 50) -> Dict[str, Any]:
         """
         Move all emails matching a search query to trash.
