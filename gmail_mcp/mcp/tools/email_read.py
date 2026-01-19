@@ -12,7 +12,7 @@ from googleapiclient.errors import HttpError
 
 from gmail_mcp.utils.logger import get_logger
 from gmail_mcp.utils.services import get_gmail_service
-from gmail_mcp.utils.date_parser import parse_natural_date, parse_date_range, DATE_PARSING_HINT
+from gmail_mcp.utils.date_parser import parse_natural_date, parse_week_range, DATE_PARSING_HINT
 from gmail_mcp.auth.oauth import get_credentials
 from gmail_mcp.gmail.helpers import extract_email_info
 
@@ -264,7 +264,7 @@ def setup_email_read_tools(mcp: FastMCP) -> None:
 
             # Handle date_range (overrides after/before)
             if date_range:
-                start_dt, end_dt = parse_date_range(date_range)
+                start_dt, end_dt = parse_week_range(date_range)
                 if start_dt:
                     final_query += f" after:{start_dt.strftime('%Y/%m/%d')}"
                 if end_dt:
