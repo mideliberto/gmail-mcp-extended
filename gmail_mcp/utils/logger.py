@@ -43,25 +43,29 @@ def setup_logger(name: Optional[str] = None) -> logging.Logger:
     """
     # Get the logger
     logger = logging.getLogger(name or "gmail_mcp")
-    
+
+    # Avoid adding duplicate handlers on repeated calls
+    if logger.handlers:
+        return logger
+
     # Set the log level from config or default to INFO
     log_level_str = get_log_level().upper()
     log_level = getattr(logging, log_level_str, logging.INFO)
     logger.setLevel(log_level)
-    
+
     # Create a console handler
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(log_level)
-    
+
     # Create a formatter
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
     console_handler.setFormatter(formatter)
-    
+
     # Add the handler to the logger
     logger.addHandler(console_handler)
-    
+
     return logger
 
 

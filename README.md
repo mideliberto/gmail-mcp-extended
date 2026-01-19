@@ -78,6 +78,7 @@ Extended fork of [bastienchabal/gmail-mcp](https://github.com/bastienchabal/gmai
 ### Calendar Management
 - `list_calendar_events` - View upcoming events
 - `create_calendar_event` - Create new events
+- `create_recurring_event` - Create recurring events (daily, weekly, monthly, yearly with RRULE)
 - `update_calendar_event` - Modify existing events
 - `delete_calendar_event` - Remove events
 - `rsvp_event` - Respond to invitations
@@ -210,6 +211,8 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 "Move my dentist appointment to 3pm"
 "Do I have any scheduling conflicts this week?"
 "Find a free hour for a meeting with John tomorrow"
+"Create a recurring daily standup at 9am for 2 weeks"
+"Set up a bi-weekly 1:1 meeting every other Tuesday"
 
 # Vault Integration
 "Save this email to my vault"
