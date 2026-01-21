@@ -29,6 +29,25 @@ All calendar and email search functions now support rich NLP expressions:
 - `check_conflicts` - Detect scheduling conflicts across calendars
 - `find_free_time` - Find available time slots across all calendars
 - `get_daily_agenda` - Unified view of events from all calendars
+- `check_attendee_availability` - Query freebusy for multiple attendees
+
+### Contact Lookup (People API)
+- `list_contacts` - List contacts from Google Contacts
+- `search_contacts` - Search contacts by name/email
+- `get_contact` - Get full contact details
+
+### Vacation Responder
+- `get_vacation_responder` - Check vacation auto-reply status
+- `set_vacation_responder` - Enable/configure vacation auto-reply
+- `disable_vacation_responder` - Turn off vacation auto-reply
+
+### Scheduled Send
+- `compose_email` now supports `send_at` parameter for scheduling
+- Creates draft + calendar reminder for manual send at scheduled time
+
+### Custom Event Reminders
+- `create_calendar_event`, `create_recurring_event`, `update_calendar_event` now support `reminders` parameter
+- Natural language reminders: `["30 minutes", "1 day before by email"]`
 
 ### Gmail Filter Management
 - `list_filters` - View all Gmail filters
@@ -52,11 +71,21 @@ All calendar and email search functions now support rich NLP expressions:
 ## All Features
 
 ### Email Compose & Send
-- `compose_email` - Send new emails (not just replies)
+- `compose_email` - Send new emails (supports `send_at` for scheduled send)
 - `forward_email` - Forward existing emails
 - `send_email_reply` - Create reply draft
 - `confirm_send_email` - Send after user confirmation
 - `prepare_email_reply` - Get context for crafting replies
+
+### Email Settings
+- `get_vacation_responder` - Get vacation auto-reply status
+- `set_vacation_responder` - Configure vacation auto-reply (supports NLP dates)
+- `disable_vacation_responder` - Disable vacation auto-reply
+
+### Contacts (People API)
+- `list_contacts` - List Google Contacts
+- `search_contacts` - Search contacts by query
+- `get_contact` - Get contact by email or resource ID
 
 ### Email Organization
 - `archive_email` - Archive emails (remove from inbox)
@@ -90,13 +119,14 @@ All calendar and email search functions now support rich NLP expressions:
 
 ### Calendar Management
 - `list_calendar_events` - View upcoming events (supports NLP: `time_min="tomorrow"`)
-- `create_calendar_event` - Create new events (supports NLP: `start_time="next monday at 2pm"`)
-- `create_recurring_event` - Create recurring events with RRULE or NLP (`recurrence_pattern="every weekday"`)
-- `update_calendar_event` - Modify existing events
+- `create_calendar_event` - Create new events (supports NLP: `start_time="next monday at 2pm"`, custom `reminders`)
+- `create_recurring_event` - Create recurring events with RRULE or NLP (`recurrence_pattern="every weekday"`, custom `reminders`)
+- `update_calendar_event` - Modify existing events (supports custom `reminders`)
 - `delete_calendar_event` - Remove events
 - `rsvp_event` - Respond to invitations
 - `suggest_meeting_times` - Find available slots (supports NLP date ranges)
 - `detect_events_from_email` - Extract events from emails
+- `check_attendee_availability` - Query freebusy for attendee availability
 
 ### Utilities
 - `find_unsubscribe_link` - Extract unsubscribe links from newsletters
@@ -130,7 +160,9 @@ All calendar and email search functions now support rich NLP expressions:
 
 ## Configuration
 
-### Google Cloud Setup
+> **📖 New to Google Cloud?** See [docs/setup.md](docs/setup.md) for a detailed step-by-step guide with explanations.
+
+### Google Cloud Setup (Quick Reference)
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a project and enable:
@@ -143,9 +175,10 @@ All calendar and email search functions now support rich NLP expressions:
    - `https://www.googleapis.com/auth/gmail.send`
    - `https://www.googleapis.com/auth/gmail.labels`
    - `https://www.googleapis.com/auth/gmail.modify`
-   - `https://www.googleapis.com/auth/gmail.settings.basic` (for filters)
+   - `https://www.googleapis.com/auth/gmail.settings.basic` (for filters, vacation responder)
    - `https://www.googleapis.com/auth/calendar.readonly`
    - `https://www.googleapis.com/auth/calendar.events`
+   - `https://www.googleapis.com/auth/contacts.readonly` (for People API - contact lookup)
 
 ### config.yaml
 
@@ -261,15 +294,17 @@ gmail_mcp/
     └── tools/           # Modular tool definitions
         ├── auth.py      # Authentication tools
         ├── email_read.py
-        ├── email_send.py
+        ├── email_send.py     # Compose, forward, reply (+ scheduled send)
         ├── email_manage.py
+        ├── email_settings.py # Vacation responder
         ├── labels.py
         ├── attachments.py
         ├── bulk.py
-        ├── calendar.py
-        ├── filters.py   # Gmail filter management
-        ├── vault.py     # Obsidian vault integration
-        └── conflict.py  # Multi-calendar conflict detection
+        ├── calendar.py       # Events, RSVP (+ custom reminders)
+        ├── contacts.py       # People API contact lookup
+        ├── filters.py        # Gmail filter management
+        ├── vault.py          # Obsidian vault integration
+        └── conflict.py       # Multi-calendar conflict detection (+ attendee availability)
 ```
 
 ## Type Support

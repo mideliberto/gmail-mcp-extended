@@ -855,3 +855,260 @@ class TestCreateRecurringEvent:
         assert result.get("success", False) or "event_id" in result
         if result.get("success"):
             assert "INTERVAL=2" in result["recurrence"]
+
+
+class TestParseReminder:
+    """Tests for _parse_reminder helper function."""
+
+    def test_parse_minutes(self):
+        """Test parsing minute-based reminders."""
+        from gmail_mcp.mcp.tools.calendar import _parse_reminder
+
+        result = _parse_reminder("30 minutes")
+        assert result["method"] == "popup"
+        assert result["minutes"] == 30
+
+        result = _parse_reminder("15 minutes before")
+        assert result["method"] == "popup"
+        assert result["minutes"] == 15
+
+    def test_parse_hours(self):
+        """Test parsing hour-based reminders."""
+        from gmail_mcp.mcp.tools.calendar import _parse_reminder
+
+        result = _parse_reminder("1 hour")
+        assert result["method"] == "popup"
+        assert result["minutes"] == 60
+
+        result = _parse_reminder("2 hours before")
+        assert result["method"] == "popup"
+        assert result["minutes"] == 120
+
+    def test_parse_days(self):
+        """Test parsing day-based reminders."""
+        from gmail_mcp.mcp.tools.calendar import _parse_reminder
+
+        result = _parse_reminder("1 day")
+        assert result["method"] == "popup"
+        assert result["minutes"] == 1440  # 24 * 60
+
+        result = _parse_reminder("2 days before")
+        assert result["method"] == "popup"
+        assert result["minutes"] == 2880  # 2 * 24 * 60
+
+    def test_parse_weeks(self):
+        """Test parsing week-based reminders."""
+        from gmail_mcp.mcp.tools.calendar import _parse_reminder
+
+        result = _parse_reminder("1 week")
+        assert result["method"] == "popup"
+        assert result["minutes"] == 10080  # 7 * 24 * 60
+
+    def test_parse_half_hour(self):
+        """Test parsing half hour reminder."""
+        from gmail_mcp.mcp.tools.calendar import _parse_reminder
+
+        result = _parse_reminder("half hour")
+        assert result["method"] == "popup"
+        assert result["minutes"] == 30
+
+    def test_parse_quarter_hour(self):
+        """Test parsing quarter hour reminder."""
+        from gmail_mcp.mcp.tools.calendar import _parse_reminder
+
+        result = _parse_reminder("quarter hour")
+        assert result["method"] == "popup"
+        assert result["minutes"] == 15
+
+    def test_parse_email_method(self):
+        """Test parsing email reminders."""
+        from gmail_mcp.mcp.tools.calendar import _parse_reminder
+
+        result = _parse_reminder("30 minutes by email")
+        assert result["method"] == "email"
+        assert result["minutes"] == 30
+
+        result = _parse_reminder("1 day before by email")
+        assert result["method"] == "email"
+        assert result["minutes"] == 1440
+
+    def test_parse_dict_passthrough(self):
+        """Test dict passthrough."""
+        from gmail_mcp.mcp.tools.calendar import _parse_reminder
+
+        result = _parse_reminder({"method": "popup", "minutes": 45})
+        assert result["method"] == "popup"
+        assert result["minutes"] == 45
+
+    def test_parse_invalid_dict(self):
+        """Test invalid dict returns None."""
+        from gmail_mcp.mcp.tools.calendar import _parse_reminder
+
+        result = _parse_reminder({"foo": "bar"})
+        assert result is None
+
+    def test_parse_invalid_string(self):
+        """Test invalid string returns None."""
+        from gmail_mcp.mcp.tools.calendar import _parse_reminder
+
+        result = _parse_reminder("invalid reminder text")
+        assert result is None
+
+
+class TestParseReminders:
+    """Tests for _parse_reminders helper function."""
+
+    def test_parse_multiple_reminders(self):
+        """Test parsing multiple reminders."""
+        from gmail_mcp.mcp.tools.calendar import _parse_reminders
+
+        reminders = ["30 minutes", "1 day before by email"]
+        result = _parse_reminders(reminders)
+
+        assert len(result) == 2
+        assert result[0]["method"] == "popup"
+        assert result[0]["minutes"] == 30
+        assert result[1]["method"] == "email"
+        assert result[1]["minutes"] == 1440
+
+    def test_parse_mixed_reminders(self):
+        """Test parsing mixed string and dict reminders."""
+        from gmail_mcp.mcp.tools.calendar import _parse_reminders
+
+        reminders = [
+            "1 hour",
+            {"method": "popup", "minutes": 15}
+        ]
+        result = _parse_reminders(reminders)
+
+        assert len(result) == 2
+        assert result[0]["minutes"] == 60
+        assert result[1]["minutes"] == 15
+
+    def test_parse_with_invalid_filtered(self):
+        """Test that invalid reminders are filtered out."""
+        from gmail_mcp.mcp.tools.calendar import _parse_reminders
+
+        reminders = ["30 minutes", "invalid text", "1 hour"]
+        result = _parse_reminders(reminders)
+
+        assert len(result) == 2  # Invalid one is filtered
+
+    def test_parse_empty_list(self):
+        """Test parsing empty reminder list."""
+        from gmail_mcp.mcp.tools.calendar import _parse_reminders
+
+        result = _parse_reminders([])
+        assert result == []
+
+
+class TestCreateEventWithReminders:
+    """Tests for create_calendar_event with reminders parameter."""
+
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_calendar_service")
+    @patch("gmail_mcp.calendar.processor.get_credentials")
+    @patch("gmail_mcp.calendar.processor.build")
+    def test_create_event_with_reminders(self, mock_proc_build, mock_proc_creds,
+                                          mock_build, mock_get_credentials):
+        """Test creating event with custom reminders."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_credentials = Mock()
+        mock_get_credentials.return_value = mock_credentials
+        mock_proc_creds.return_value = mock_credentials
+        mock_service = create_mock_calendar_service()
+        mock_build.return_value = mock_service
+        mock_proc_build.return_value = mock_service
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        create_calendar_event = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "create_calendar_event":
+                create_calendar_event = tool.fn
+                break
+
+        assert create_calendar_event is not None
+
+        result = create_calendar_event(
+            summary="Meeting with Reminders",
+            start_time="2024-06-15T14:00:00",
+            end_time="2024-06-15T15:00:00",
+            reminders=["30 minutes", "1 day before by email"]
+        )
+
+        assert "error" not in result or result.get("success", False)
+
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_calendar_service")
+    @patch("gmail_mcp.calendar.processor.get_credentials")
+    @patch("gmail_mcp.calendar.processor.build")
+    def test_create_recurring_event_with_reminders(self, mock_proc_build, mock_proc_creds,
+                                                    mock_get_service, mock_get_credentials):
+        """Test creating recurring event with custom reminders."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_credentials = Mock()
+        mock_get_credentials.return_value = mock_credentials
+        mock_proc_creds.return_value = mock_credentials
+        mock_service = create_mock_calendar_service()
+        mock_get_service.return_value = mock_service
+        mock_proc_build.return_value = mock_service
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        create_recurring_event = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "create_recurring_event":
+                create_recurring_event = tool.fn
+                break
+
+        assert create_recurring_event is not None
+
+        result = create_recurring_event(
+            summary="Daily Standup with Reminders",
+            start_time="2024-06-15T09:00:00",
+            frequency="DAILY",
+            count=10,
+            reminders=["15 minutes", "1 hour by email"]
+        )
+
+        assert result.get("success", False) or "event_id" in result
+
+
+class TestUpdateEventWithReminders:
+    """Tests for update_calendar_event with reminders parameter."""
+
+    @patch("gmail_mcp.mcp.tools.calendar.get_credentials")
+    @patch("gmail_mcp.mcp.tools.calendar.get_calendar_service")
+    def test_update_event_with_reminders(self, mock_get_service, mock_get_credentials):
+        """Test updating event with custom reminders."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_credentials = Mock()
+        mock_get_credentials.return_value = mock_credentials
+        mock_get_service.return_value = create_mock_calendar_service()
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        update_calendar_event = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "update_calendar_event":
+                update_calendar_event = tool.fn
+                break
+
+        assert update_calendar_event is not None
+
+        result = update_calendar_event(
+            event_id="event001",
+            reminders=["45 minutes", "2 hours before by email"]
+        )
+
+        assert "error" not in result or result.get("success", False)

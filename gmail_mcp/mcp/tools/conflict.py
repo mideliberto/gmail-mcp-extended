@@ -531,3 +531,254 @@ def setup_conflict_tools(mcp: FastMCP) -> None:
         except Exception as e:
             logger.error(f"Failed to get daily agenda: {e}")
             return {"success": False, "error": f"Failed to get daily agenda: {e}"}
+
+    @mcp.tool()
+    def check_attendee_availability(
+        attendees: List[str],
+        start_date: str,
+        end_date: str,
+        duration_minutes: int = 60,
+        duration: Optional[str] = None,
+        working_hours: str = "9-17"
+    ) -> Dict[str, Any]:
+        """
+        Check availability of multiple attendees and find common free times.
+
+        Uses the Calendar API's freebusy query to check when attendees are
+        available, then finds time slots where ALL attendees are free.
+
+        Note: Only works for attendees who share their calendar with you
+        or are in the same Google Workspace organization.
+
+        Args:
+            attendees (List[str]): List of email addresses to check availability for
+            start_date (str): Start of date range (e.g., "tomorrow", "2026-01-25")
+            end_date (str): End of date range (e.g., "friday", "2026-01-30")
+            duration_minutes (int): Required meeting duration in minutes (default: 60)
+            duration (str, optional): Duration as natural language (e.g., "1 hour").
+                                     If provided, overrides duration_minutes.
+            working_hours (str): Working hours to consider (e.g., "9-17", "9am-5pm")
+
+        Returns:
+            Dict[str, Any]: Availability analysis including:
+                - attendees_checked: List of attendees checked
+                - common_free_slots: Times when ALL attendees are free
+                - individual_availability: Per-attendee busy times
+                - errors: Any attendees whose calendars couldn't be checked
+
+        Example usage:
+        1. Find meeting times with colleagues:
+           check_attendee_availability(
+               attendees=["alice@company.com", "bob@company.com"],
+               start_date="tomorrow",
+               end_date="friday",
+               duration="1 hour"
+           )
+
+        2. Find 30-minute slot this week:
+           check_attendee_availability(
+               attendees=["manager@company.com"],
+               start_date="today",
+               end_date="friday",
+               duration_minutes=30
+           )
+        """
+        credentials = get_credentials()
+
+        if not credentials:
+            return {"success": False, "error": "Not authenticated. Please use the authenticate tool first."}
+
+        if not attendees:
+            return {"success": False, "error": "At least one attendee email is required"}
+
+        try:
+            service = get_calendar_service(credentials)
+            user_tz = get_user_timezone()
+
+            # Parse dates using centralized NLP parser
+            start_dt = parse_natural_date(start_date, timezone=user_tz, prefer_future=True)
+            if not start_dt:
+                return {
+                    "success": False,
+                    "error": f"Could not parse start date: {start_date}",
+                    "hint": DATE_PARSING_HINT
+                }
+
+            end_dt = parse_natural_date(end_date, timezone=user_tz, prefer_future=True)
+            if not end_dt:
+                return {
+                    "success": False,
+                    "error": f"Could not parse end date: {end_date}",
+                    "hint": DATE_PARSING_HINT
+                }
+
+            # Ensure end_date is end of day
+            end_dt = end_dt.replace(hour=23, minute=59, second=59)
+
+            # Parse duration
+            if duration:
+                actual_duration = parse_duration(duration)
+            else:
+                actual_duration = duration_minutes
+
+            # Parse working hours
+            work_start_hour, work_end_hour = parse_working_hours(working_hours)
+
+            # Add timezone if missing
+            import pytz
+            try:
+                tz = pytz.timezone(user_tz)
+                if start_dt.tzinfo is None:
+                    start_dt = tz.localize(start_dt)
+                if end_dt.tzinfo is None:
+                    end_dt = tz.localize(end_dt)
+            except Exception:
+                if start_dt.tzinfo is None:
+                    start_dt = start_dt.replace(tzinfo=timezone.utc)
+                if end_dt.tzinfo is None:
+                    end_dt = end_dt.replace(tzinfo=timezone.utc)
+
+            # Build freebusy query
+            freebusy_query = {
+                "timeMin": start_dt.isoformat(),
+                "timeMax": end_dt.isoformat(),
+                "timeZone": user_tz,
+                "items": [{"id": email} for email in attendees]
+            }
+
+            # Execute freebusy query
+            freebusy_result = service.freebusy().query(body=freebusy_query).execute()
+
+            # Process results
+            calendars_info = freebusy_result.get("calendars", {})
+            individual_availability = {}
+            all_busy_times = []
+            errors = []
+
+            for email in attendees:
+                cal_info = calendars_info.get(email, {})
+
+                if cal_info.get("errors"):
+                    errors.append({
+                        "email": email,
+                        "error": cal_info["errors"][0].get("reason", "Unknown error")
+                    })
+                    continue
+
+                busy_periods = cal_info.get("busy", [])
+                individual_availability[email] = {
+                    "busy_periods": len(busy_periods),
+                    "busy_times": [
+                        {
+                            "start": period["start"],
+                            "end": period["end"]
+                        }
+                        for period in busy_periods
+                    ]
+                }
+
+                # Collect all busy times for finding common free slots
+                for period in busy_periods:
+                    busy_start = parser.parse(period["start"])
+                    busy_end = parser.parse(period["end"])
+                    all_busy_times.append((busy_start, busy_end))
+
+            # Sort and merge overlapping busy times
+            all_busy_times.sort(key=lambda x: x[0])
+            merged_busy = []
+            for start, end in all_busy_times:
+                if merged_busy and start <= merged_busy[-1][1]:
+                    merged_busy[-1] = (merged_busy[-1][0], max(merged_busy[-1][1], end))
+                else:
+                    merged_busy.append((start, end))
+
+            # Find common free slots within working hours
+            common_free_slots = []
+            current_date = start_dt.date()
+            end_date_only = end_dt.date()
+
+            try:
+                tz = pytz.timezone(user_tz)
+            except Exception:
+                tz = timezone.utc
+
+            while current_date <= end_date_only:
+                # Skip weekends
+                if current_date.weekday() >= 5:  # Saturday = 5, Sunday = 6
+                    current_date += timedelta(days=1)
+                    continue
+
+                # Define working hours for this day
+                day_start = datetime.combine(current_date, datetime.min.time().replace(hour=work_start_hour))
+                day_end = datetime.combine(current_date, datetime.min.time().replace(hour=work_end_hour))
+
+                if isinstance(tz, timezone):
+                    day_start = day_start.replace(tzinfo=tz)
+                    day_end = day_end.replace(tzinfo=tz)
+                else:
+                    day_start = tz.localize(day_start)
+                    day_end = tz.localize(day_end)
+
+                # Find free slots on this day
+                current_time = day_start
+
+                for busy_start, busy_end in merged_busy:
+                    # Skip if busy period is not on this day
+                    if busy_end.date() < current_date or busy_start.date() > current_date:
+                        continue
+
+                    # Adjust busy times to this day's working hours
+                    effective_busy_start = max(busy_start, day_start)
+                    effective_busy_end = min(busy_end, day_end)
+
+                    if current_time < effective_busy_start:
+                        gap_duration = (effective_busy_start - current_time).total_seconds() / 60
+                        if gap_duration >= actual_duration:
+                            common_free_slots.append({
+                                "date": str(current_date),
+                                "start": current_time.isoformat(),
+                                "end": effective_busy_start.isoformat(),
+                                "start_display": current_time.strftime("%I:%M %p"),
+                                "end_display": effective_busy_start.strftime("%I:%M %p"),
+                                "duration_minutes": int(gap_duration)
+                            })
+
+                    current_time = max(current_time, effective_busy_end)
+
+                # Check for gap after last busy time on this day
+                if current_time < day_end:
+                    gap_duration = (day_end - current_time).total_seconds() / 60
+                    if gap_duration >= actual_duration:
+                        common_free_slots.append({
+                            "date": str(current_date),
+                            "start": current_time.isoformat(),
+                            "end": day_end.isoformat(),
+                            "start_display": current_time.strftime("%I:%M %p"),
+                            "end_display": day_end.strftime("%I:%M %p"),
+                            "duration_minutes": int(gap_duration)
+                        })
+
+                current_date += timedelta(days=1)
+
+            # Limit to first 15 slots
+            common_free_slots = common_free_slots[:15]
+
+            return {
+                "success": True,
+                "attendees_checked": [e for e in attendees if e not in [err["email"] for err in errors]],
+                "date_range": {
+                    "start": start_dt.isoformat(),
+                    "end": end_dt.isoformat()
+                },
+                "duration_required": actual_duration,
+                "working_hours": f"{work_start_hour}:00 - {work_end_hour}:00",
+                "common_free_slots": common_free_slots,
+                "slot_count": len(common_free_slots),
+                "individual_availability": individual_availability,
+                "errors": errors if errors else None,
+                "note": "Only shows availability for calendars shared with you or in same organization"
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to check attendee availability: {e}")
+            return {"success": False, "error": f"Failed to check attendee availability: {e}"}

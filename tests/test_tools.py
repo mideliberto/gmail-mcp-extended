@@ -437,3 +437,199 @@ class TestExtractEmailInfoIntegration:
         expected_keys = ["id", "thread_id", "subject", "from", "to", "cc", "date", "snippet", "labels", "email_link"]
         for key in expected_keys:
             assert key in email, f"Missing key: {key}"
+
+
+class TestComposeEmailScheduledSend:
+    """Tests for compose_email tool with send_at parameter (scheduled send)."""
+
+    @patch("gmail_mcp.mcp.tools.email_send.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_send.get_gmail_service")
+    def test_compose_email_no_schedule(self, mock_get_service, mock_get_credentials):
+        """Test compose_email without scheduling."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_credentials = Mock()
+        mock_get_credentials.return_value = mock_credentials
+
+        mock_service = MagicMock()
+        mock_service.users().drafts().create().execute.return_value = {
+            "id": "draft123",
+            "message": {"id": "msg123"}
+        }
+        mock_get_service.return_value = mock_service
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        compose_email = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "compose_email":
+                compose_email = tool.fn
+                break
+
+        assert compose_email is not None, "compose_email tool not found"
+
+        result = compose_email(
+            to="recipient@example.com",
+            subject="Test Subject",
+            body="Test body content"
+        )
+
+        assert result["success"] is True
+        assert result["draft_id"] == "draft123"
+        assert result["confirmation_required"] is True
+        assert "scheduled_for" not in result
+        assert "event_id" not in result
+
+    @patch("gmail_mcp.mcp.tools.email_send.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_send.get_gmail_service")
+    @patch("gmail_mcp.mcp.tools.email_send.get_calendar_service")
+    def test_compose_email_with_schedule(self, mock_get_calendar_service, mock_get_service, mock_get_credentials):
+        """Test compose_email with send_at scheduling."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_credentials = Mock()
+        mock_get_credentials.return_value = mock_credentials
+
+        # Mock Gmail service
+        mock_gmail_service = MagicMock()
+        mock_gmail_service.users().drafts().create().execute.return_value = {
+            "id": "draft456",
+            "message": {"id": "msg456"}
+        }
+        mock_get_service.return_value = mock_gmail_service
+
+        # Mock Calendar service
+        mock_calendar_service = MagicMock()
+        mock_calendar_service.events().insert().execute.return_value = {
+            "id": "event789",
+            "htmlLink": "https://calendar.google.com/event?eid=event789"
+        }
+        mock_get_calendar_service.return_value = mock_calendar_service
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        compose_email = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "compose_email":
+                compose_email = tool.fn
+                break
+
+        result = compose_email(
+            to="recipient@example.com",
+            subject="Scheduled Email",
+            body="This will be scheduled.",
+            send_at="tomorrow 8am"
+        )
+
+        assert result["success"] is True
+        assert result["draft_id"] == "draft456"
+        assert "scheduled_for" in result
+        assert result["event_id"] == "event789"
+        assert "event_link" in result
+        assert "next_steps" in result
+
+    @patch("gmail_mcp.mcp.tools.email_send.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_send.get_gmail_service")
+    def test_compose_email_invalid_schedule_date(self, mock_get_service, mock_get_credentials):
+        """Test compose_email with invalid send_at date."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_credentials = Mock()
+        mock_get_credentials.return_value = mock_credentials
+
+        mock_service = MagicMock()
+        mock_service.users().drafts().create().execute.return_value = {
+            "id": "draft789",
+            "message": {"id": "msg789"}
+        }
+        mock_get_service.return_value = mock_service
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        compose_email = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "compose_email":
+                compose_email = tool.fn
+                break
+
+        result = compose_email(
+            to="recipient@example.com",
+            subject="Test",
+            body="Test",
+            send_at="invalid date format xyz"
+        )
+
+        # Draft should still be created, but with a warning about date parsing
+        assert result["success"] is True
+        assert result["draft_id"] == "draft789"
+        assert "warning" in result
+        assert "event_id" not in result
+
+    @patch("gmail_mcp.mcp.tools.email_send.get_credentials")
+    def test_compose_email_not_authenticated(self, mock_get_credentials):
+        """Test compose_email when not authenticated."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_get_credentials.return_value = None
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        compose_email = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "compose_email":
+                compose_email = tool.fn
+                break
+
+        result = compose_email(
+            to="recipient@example.com",
+            subject="Test",
+            body="Test"
+        )
+
+        assert result["success"] is False
+        assert "Not authenticated" in result["error"]
+
+    @patch("gmail_mcp.mcp.tools.email_send.get_credentials")
+    @patch("gmail_mcp.mcp.tools.email_send.get_gmail_service")
+    def test_compose_email_with_cc_bcc(self, mock_get_service, mock_get_credentials):
+        """Test compose_email with CC and BCC recipients."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_credentials = Mock()
+        mock_get_credentials.return_value = mock_credentials
+
+        mock_service = MagicMock()
+        mock_service.users().drafts().create().execute.return_value = {
+            "id": "draft_cc_bcc",
+            "message": {"id": "msg_cc_bcc"}
+        }
+        mock_get_service.return_value = mock_service
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        compose_email = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "compose_email":
+                compose_email = tool.fn
+                break
+
+        result = compose_email(
+            to="recipient@example.com",
+            subject="Test with CC/BCC",
+            body="Test body",
+            cc="cc@example.com",
+            bcc="bcc@example.com"
+        )
+
+        assert result["success"] is True
+        assert result["draft_id"] == "draft_cc_bcc"

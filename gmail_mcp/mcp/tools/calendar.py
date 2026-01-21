@@ -28,6 +28,83 @@ from gmail_mcp.calendar.processor import (
 logger = get_logger(__name__)
 
 
+def _parse_reminder(reminder_str: str) -> Optional[Dict[str, Any]]:
+    """
+    Parse a reminder string into Google Calendar reminder format.
+
+    Supports formats like:
+    - "30 minutes" or "30 minutes before"
+    - "1 hour" or "1 hour before"
+    - "1 day" or "1 day before"
+    - "30 minutes by email" or "1 day before by email"
+    - {"method": "popup", "minutes": 30}  (dict passthrough)
+
+    Args:
+        reminder_str: The reminder string or dict
+
+    Returns:
+        Dict with "method" and "minutes" keys, or None if parsing fails
+    """
+    if isinstance(reminder_str, dict):
+        # Passthrough for dict format
+        if "method" in reminder_str and "minutes" in reminder_str:
+            return reminder_str
+        return None
+
+    reminder_str = str(reminder_str).lower().strip()
+
+    # Determine method (default: popup)
+    method = "popup"
+    if "email" in reminder_str:
+        method = "email"
+        reminder_str = reminder_str.replace("by email", "").replace("email", "").strip()
+
+    # Remove "before" suffix
+    reminder_str = reminder_str.replace("before", "").strip()
+
+    # Parse time value
+    minutes = None
+
+    # Try common patterns
+    patterns = [
+        (r"(\d+)\s*minutes?", lambda m: int(m.group(1))),
+        (r"(\d+)\s*hours?", lambda m: int(m.group(1)) * 60),
+        (r"(\d+)\s*days?", lambda m: int(m.group(1)) * 60 * 24),
+        (r"(\d+)\s*weeks?", lambda m: int(m.group(1)) * 60 * 24 * 7),
+        (r"half\s*hour", lambda m: 30),
+        (r"quarter\s*hour", lambda m: 15),
+    ]
+
+    for pattern, converter in patterns:
+        match = re.search(pattern, reminder_str)
+        if match:
+            minutes = converter(match)
+            break
+
+    if minutes is None:
+        return None
+
+    return {"method": method, "minutes": minutes}
+
+
+def _parse_reminders(reminders: List) -> List[Dict[str, Any]]:
+    """
+    Parse a list of reminder specifications.
+
+    Args:
+        reminders: List of reminder strings or dicts
+
+    Returns:
+        List of parsed reminder dicts for Google Calendar API
+    """
+    parsed = []
+    for r in reminders:
+        reminder = _parse_reminder(r)
+        if reminder:
+            parsed.append(reminder)
+    return parsed
+
+
 def setup_calendar_tools(mcp: FastMCP) -> None:
     """Set up calendar tools on the FastMCP application."""
 
@@ -39,7 +116,8 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
         description: Optional[str] = None,
         location: Optional[str] = None,
         attendees: Optional[List[str]] = None,
-        color_name: Optional[str] = None
+        color_name: Optional[str] = None,
+        reminders: Optional[List] = None
     ) -> Dict[str, Any]:
         """
         Create a new event in the user's Google Calendar.
@@ -57,6 +135,9 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
             location (str, optional): Location of the event. If not provided, leave it blank.
             attendees (List[str], optional): List of email addresses of attendees. The current user will always be added automatically.
             color_name (str, optional): Color name for the event (e.g., "red", "blue", "green", "purple", "yellow", "orange")
+            reminders (List, optional): Custom reminders for the event. Can be:
+                - List of strings: ["30 minutes", "1 day before by email"]
+                - List of dicts: [{"method": "popup", "minutes": 30}, {"method": "email", "minutes": 1440}]
 
         Returns:
             Dict[str, Any]: The result of the operation, including:
@@ -70,7 +151,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
         1. Create a simple event:
            create_calendar_event(summary="Team Meeting", start_time="2023-12-01T14:00:00")
 
-        2. Create a detailed event:
+        2. Create a detailed event with reminders:
            create_calendar_event(
                summary="Project Kickoff",
                start_time="next monday at 10am",
@@ -78,7 +159,8 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
                description="Initial meeting to discuss project scope",
                location="Conference Room A",
                attendees=["colleague@example.com", "manager@example.com"],
-               color_name="blue"
+               color_name="blue",
+               reminders=["30 minutes", "1 day before by email"]
            )
         """
         credentials = get_credentials()
@@ -120,6 +202,18 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
                     "current_datetime": event_body.get("current_datetime"),
                     "missing_info": missing_info
                 }
+
+            # Add custom reminders if provided
+            if reminders:
+                parsed_reminders = _parse_reminders(reminders)
+                if parsed_reminders:
+                    event_body["reminders"] = {
+                        "useDefault": False,
+                        "overrides": parsed_reminders
+                    }
+
+            # Remove internal _parsed field before sending to API
+            event_body.pop("_parsed", None)
 
             created_event = service.events().insert(calendarId="primary", body=event_body).execute()
 
@@ -187,7 +281,8 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
         count: Optional[int] = None,
         until: Optional[str] = None,
         by_day: Optional[List[str]] = None,
-        recurrence_pattern: Optional[str] = None
+        recurrence_pattern: Optional[str] = None,
+        reminders: Optional[List] = None
     ) -> Dict[str, Any]:
         """
         Create a recurring event in the user's Google Calendar.
@@ -340,6 +435,15 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
 
             # Add recurrence rule
             event_body["recurrence"] = [rrule]
+
+            # Add custom reminders if provided
+            if reminders:
+                parsed_reminders = _parse_reminders(reminders)
+                if parsed_reminders:
+                    event_body["reminders"] = {
+                        "useDefault": False,
+                        "overrides": parsed_reminders
+                    }
 
             # Remove internal _parsed field before sending to API
             event_body.pop("_parsed", None)
@@ -801,7 +905,8 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
         start_time: Optional[str] = None,
         end_time: Optional[str] = None,
         description: Optional[str] = None,
-        location: Optional[str] = None
+        location: Optional[str] = None,
+        reminders: Optional[List] = None
     ) -> Dict[str, Any]:
         """
         Update an existing calendar event.
@@ -813,6 +918,9 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
             end_time (str, optional): New end time
             description (str, optional): New description
             location (str, optional): New location
+            reminders (List, optional): Custom reminders. Can be:
+                - List of strings: ["30 minutes", "1 day before by email"]
+                - List of dicts: [{"method": "popup", "minutes": 30}]
 
         Returns:
             Dict[str, Any]: Updated event details
@@ -847,6 +955,14 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
                 if not end_dt:
                     return {"success": False, "error": f"Could not parse end time: {end_time}"}
                 event["end"] = {"dateTime": end_dt.isoformat(), "timeZone": user_timezone}
+
+            if reminders:
+                parsed_reminders = _parse_reminders(reminders)
+                if parsed_reminders:
+                    event["reminders"] = {
+                        "useDefault": False,
+                        "overrides": parsed_reminders
+                    }
 
             updated_event = service.events().update(
                 calendarId="primary",

@@ -28,11 +28,31 @@ Overview of all tools, resources, and prompts in the Gmail MCP server.
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `compose_email` | Create new email draft | `to`, `subject`, `body`, `cc`, `bcc` |
+| `compose_email` | Create new email draft | `to`, `subject`, `body`, `cc`, `bcc`, `send_at`* |
 | `forward_email` | Forward an email | `email_id`, `to`, `additional_message` |
 | `prepare_email_reply` | Get context for reply | `email_id` |
 | `send_email_reply` | Create reply draft | `email_id`, `reply_text`, `include_original` |
 | `confirm_send_email` | Send a draft | `draft_id` |
+
+*`send_at` creates a calendar reminder for manual send at scheduled time
+
+### Email - Settings
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `get_vacation_responder` | Get vacation auto-reply status | None |
+| `set_vacation_responder` | Configure vacation auto-reply | `enabled`, `subject`, `message`, `start_date`*, `end_date`*, `contacts_only` |
+| `disable_vacation_responder` | Turn off vacation auto-reply | None |
+
+*Supports NLP dates
+
+### Contacts (People API)
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `list_contacts` | List Google Contacts | `max_results`, `page_token` |
+| `search_contacts` | Search contacts by query | `query`, `max_results` |
+| `get_contact` | Get contact details | `email` or `resource_name` |
 
 ### Email - Management
 
@@ -82,16 +102,23 @@ All calendar tools support **natural language dates**: `tomorrow`, `next monday`
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `create_calendar_event` | Create event | `summary`, `start_time`*, `end_time`, `description`, `location`, `attendees`, `color_name` |
-| `create_recurring_event` | Create recurring event | `summary`, `start_time`*, `frequency`/`recurrence_pattern`*, `end_time`, `interval`, `count`, `until`, `by_day` |
+| `create_calendar_event` | Create event | `summary`, `start_time`*, `end_time`, `description`, `location`, `attendees`, `color_name`, `reminders` |
+| `create_recurring_event` | Create recurring event | `summary`, `start_time`*, `frequency`/`recurrence_pattern`*, `end_time`, `interval`, `count`, `until`, `by_day`, `reminders` |
 | `list_calendar_events` | List events | `max_results`, `time_min`*, `time_max`*, `query` |
-| `update_calendar_event` | Update event | `event_id`, `summary`, `start_time`*, `end_time`*, `description`, `location` |
+| `update_calendar_event` | Update event | `event_id`, `summary`, `start_time`*, `end_time`*, `description`, `location`, `reminders` |
 | `delete_calendar_event` | Delete event | `event_id` |
 | `rsvp_event` | Respond to invitation | `event_id`, `response` |
 | `detect_events_from_email` | Extract events from email | `email_id` |
-| `suggest_meeting_times` | Find available slots | `start_date`*, `end_date`*, `duration_minutes`, `working_hours` |
+| `suggest_meeting_times` | Find available slots | `start_date`*, `end_date`*, `duration_minutes`/`duration`, `working_hours` |
 
 *Supports NLP dates (e.g., `tomorrow at 2pm`, `next monday`)
+
+**Custom Reminders** - The `reminders` parameter accepts natural language:
+```python
+reminders=["30 minutes", "1 hour", "1 day before by email"]
+# or explicit format:
+reminders=[{"method": "popup", "minutes": 30}, {"method": "email", "minutes": 1440}]
+```
 
 ### Multi-Calendar / Conflict Detection
 
@@ -99,8 +126,9 @@ All calendar tools support **natural language dates**: `tomorrow`, `next monday`
 |------|-------------|------------|
 | `list_calendars` | List all accessible calendars | None |
 | `check_conflicts` | Check for scheduling conflicts | `start_time`*, `end_time`*, `calendar_ids`, `exclude_all_day` |
-| `find_free_time` | Find available time slots | `date`*, `duration_minutes`, `calendar_ids`, `working_hours` |
+| `find_free_time` | Find available time slots | `date`*, `duration_minutes`/`duration`, `calendar_ids`, `working_hours` |
 | `get_daily_agenda` | Get unified daily agenda | `date`*, `calendar_ids`, `include_all_day` |
+| `check_attendee_availability` | Query freebusy for attendees | `attendees`, `start_date`*, `end_date`*, `duration_minutes`/`duration`, `working_hours` |
 
 *Supports NLP dates
 

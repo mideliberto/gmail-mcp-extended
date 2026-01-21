@@ -5,6 +5,7 @@ Handles composing, replying, forwarding, and sending emails.
 """
 
 import base64
+from datetime import timedelta
 from typing import Dict, Any, Optional
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -13,7 +14,8 @@ from mcp.server.fastmcp import FastMCP
 from googleapiclient.errors import HttpError
 
 from gmail_mcp.utils.logger import get_logger
-from gmail_mcp.utils.services import get_gmail_service
+from gmail_mcp.utils.services import get_gmail_service, get_calendar_service
+from gmail_mcp.utils.date_parser import parse_natural_date
 from gmail_mcp.auth.oauth import get_credentials
 from gmail_mcp.gmail.processor import parse_email_message, extract_entities
 from gmail_mcp.gmail.processor import (
@@ -298,11 +300,19 @@ def setup_email_send_tools(mcp: FastMCP) -> None:
             }
 
     @mcp.tool()
-    def compose_email(to: str, subject: str, body: str, cc: Optional[str] = None, bcc: Optional[str] = None) -> Dict[str, Any]:
+    def compose_email(
+        to: str,
+        subject: str,
+        body: str,
+        cc: Optional[str] = None,
+        bcc: Optional[str] = None,
+        send_at: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Compose and send a new email (not a reply).
 
         This tool creates a draft email and requires user confirmation before sending.
+        Optionally, schedule the email to be sent later by creating a calendar reminder.
 
         Args:
             to (str): Recipient email address(es), comma-separated for multiple
@@ -310,9 +320,21 @@ def setup_email_send_tools(mcp: FastMCP) -> None:
             body (str): Email body text
             cc (str, optional): CC recipients, comma-separated
             bcc (str, optional): BCC recipients, comma-separated
+            send_at (str, optional): When to send the email. Supports natural language
+                (e.g., "tomorrow 8am", "next monday at 9am") or ISO format.
+                Creates a calendar reminder instead of sending immediately.
 
         Returns:
-            Dict[str, Any]: Result including draft_id for confirmation
+            Dict[str, Any]: Result including draft_id for confirmation.
+                If send_at is provided, also includes calendar event details.
+
+        Example usage:
+        1. Send immediately (after confirmation):
+           compose_email(to="bob@example.com", subject="Hello", body="...")
+
+        2. Schedule for later:
+           compose_email(to="bob@example.com", subject="Hello", body="...", send_at="tomorrow 8am")
+           # Creates draft + calendar reminder. User sends manually when reminded.
         """
         credentials = get_credentials()
 
@@ -340,14 +362,65 @@ def setup_email_send_tools(mcp: FastMCP) -> None:
                 body={"message": {"raw": encoded_message}}
             ).execute()
 
-            return {
+            draft_link = f"https://mail.google.com/mail/u/0/#drafts?compose={draft['id']}"
+
+            result = {
                 "success": True,
-                "message": "Draft created. Call confirm_send_email to send.",
                 "draft_id": draft["id"],
+                "draft_link": draft_link,
                 "to": to,
                 "subject": subject,
                 "confirmation_required": True
             }
+
+            # If send_at is provided, create a calendar reminder
+            if send_at:
+                send_datetime = parse_natural_date(send_at, prefer_future=True)
+                if not send_datetime:
+                    result["warning"] = f"Could not parse send_at '{send_at}'. Draft created but no reminder set."
+                    result["message"] = "Draft created. Call confirm_send_email to send."
+                    return result
+
+                # Create calendar event as reminder
+                calendar_service = get_calendar_service(credentials)
+
+                event_body = {
+                    "summary": f"📧 Send email: {subject}",
+                    "description": f"Reminder to send scheduled email.\n\nTo: {to}\nSubject: {subject}\n\nDraft link: {draft_link}\n\nUse confirm_send_email(draft_id='{draft['id']}') to send.",
+                    "start": {
+                        "dateTime": send_datetime.isoformat(),
+                        "timeZone": "America/Chicago"
+                    },
+                    "end": {
+                        "dateTime": (send_datetime + timedelta(minutes=15)).isoformat(),
+                        "timeZone": "America/Chicago"
+                    },
+                    "reminders": {
+                        "useDefault": False,
+                        "overrides": [
+                            {"method": "popup", "minutes": 0}
+                        ]
+                    }
+                }
+
+                event = calendar_service.events().insert(
+                    calendarId="primary",
+                    body=event_body
+                ).execute()
+
+                result["message"] = f"Draft created and scheduled for {send_datetime.strftime('%Y-%m-%d %H:%M')}. Calendar reminder set."
+                result["scheduled_for"] = send_datetime.isoformat()
+                result["event_id"] = event.get("id")
+                result["event_link"] = event.get("htmlLink")
+                result["next_steps"] = [
+                    f"Email will NOT be sent automatically",
+                    f"You'll receive a calendar reminder at {send_datetime.strftime('%Y-%m-%d %H:%M')}",
+                    f"When reminded, use confirm_send_email(draft_id='{draft['id']}') to send"
+                ]
+            else:
+                result["message"] = "Draft created. Call confirm_send_email to send."
+
+            return result
 
         except Exception as e:
             logger.error(f"Failed to compose email: {e}")

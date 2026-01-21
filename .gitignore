@@ -54,3 +54,6 @@ tokens.json
 tokens.json.bak
 project/
 temp/
+
+# Local config overrides (use for personal settings)
+config.local.yaml

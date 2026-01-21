@@ -336,3 +336,212 @@ class TestGetDailyAgenda:
         assert result["success"] is True
         assert "timed_events" in result
         assert "all_day_events" in result
+
+
+class TestCheckAttendeeAvailability:
+    """Tests for check_attendee_availability tool."""
+
+    @patch("gmail_mcp.mcp.tools.conflict.get_credentials")
+    @patch("gmail_mcp.mcp.tools.conflict.get_calendar_service")
+    def test_check_availability_success(self, mock_get_service, mock_get_credentials):
+        """Test successful attendee availability check."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_credentials = Mock()
+        mock_get_credentials.return_value = mock_credentials
+
+        # Create mock with freebusy response
+        mock_service = MagicMock()
+        mock_service.calendarList().list().execute.return_value = SAMPLE_CALENDARS
+
+        # Mock freebusy query
+        mock_service.freebusy().query().execute.return_value = {
+            "kind": "calendar#freeBusy",
+            "timeMin": "2024-01-15T00:00:00Z",
+            "timeMax": "2024-01-19T23:59:59Z",
+            "calendars": {
+                "alice@example.com": {
+                    "busy": [
+                        {"start": "2024-01-16T14:00:00Z", "end": "2024-01-16T15:00:00Z"},
+                        {"start": "2024-01-17T10:00:00Z", "end": "2024-01-17T11:00:00Z"},
+                    ]
+                },
+                "bob@example.com": {
+                    "busy": [
+                        {"start": "2024-01-16T09:00:00Z", "end": "2024-01-16T10:00:00Z"},
+                    ]
+                }
+            }
+        }
+
+        mock_get_service.return_value = mock_service
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        check_attendee_availability = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "check_attendee_availability":
+                check_attendee_availability = tool.fn
+                break
+
+        assert check_attendee_availability is not None, "check_attendee_availability tool not found"
+
+        result = check_attendee_availability(
+            attendees=["alice@example.com", "bob@example.com"],
+            start_date="2024-01-15",
+            end_date="2024-01-19",
+            duration_minutes=60
+        )
+
+        assert result["success"] is True
+        assert "common_free_slots" in result
+        assert "individual_availability" in result
+        assert "alice@example.com" in result["individual_availability"]
+        assert "bob@example.com" in result["individual_availability"]
+
+    @patch("gmail_mcp.mcp.tools.conflict.get_credentials")
+    @patch("gmail_mcp.mcp.tools.conflict.get_calendar_service")
+    def test_check_availability_with_errors(self, mock_get_service, mock_get_credentials):
+        """Test attendee availability check with some calendar errors."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_credentials = Mock()
+        mock_get_credentials.return_value = mock_credentials
+
+        mock_service = MagicMock()
+        mock_service.calendarList().list().execute.return_value = SAMPLE_CALENDARS
+
+        # Mock freebusy with one calendar having an error
+        mock_service.freebusy().query().execute.return_value = {
+            "kind": "calendar#freeBusy",
+            "timeMin": "2024-01-15T00:00:00Z",
+            "timeMax": "2024-01-19T23:59:59Z",
+            "calendars": {
+                "alice@example.com": {
+                    "busy": [
+                        {"start": "2024-01-16T14:00:00Z", "end": "2024-01-16T15:00:00Z"},
+                    ]
+                },
+                "private@external.com": {
+                    "errors": [{"domain": "calendar", "reason": "notFound"}]
+                }
+            }
+        }
+
+        mock_get_service.return_value = mock_service
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        check_attendee_availability = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "check_attendee_availability":
+                check_attendee_availability = tool.fn
+                break
+
+        result = check_attendee_availability(
+            attendees=["alice@example.com", "private@external.com"],
+            start_date="2024-01-15",
+            end_date="2024-01-19"
+        )
+
+        assert result["success"] is True
+        assert "errors" in result
+        assert len(result["errors"]) == 1
+        assert result["errors"][0]["email"] == "private@external.com"
+
+    @patch("gmail_mcp.mcp.tools.conflict.get_credentials")
+    @patch("gmail_mcp.mcp.tools.conflict.get_calendar_service")
+    def test_check_availability_with_nlp_dates(self, mock_get_service, mock_get_credentials):
+        """Test attendee availability check with natural language dates."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_credentials = Mock()
+        mock_get_credentials.return_value = mock_credentials
+
+        mock_service = MagicMock()
+        mock_service.calendarList().list().execute.return_value = SAMPLE_CALENDARS
+        mock_service.freebusy().query().execute.return_value = {
+            "kind": "calendar#freeBusy",
+            "calendars": {
+                "colleague@example.com": {"busy": []}
+            }
+        }
+
+        mock_get_service.return_value = mock_service
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        check_attendee_availability = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "check_attendee_availability":
+                check_attendee_availability = tool.fn
+                break
+
+        result = check_attendee_availability(
+            attendees=["colleague@example.com"],
+            start_date="tomorrow",
+            end_date="friday",
+            duration="30 minutes",
+            working_hours="9am to 5pm"
+        )
+
+        assert result["success"] is True
+
+    @patch("gmail_mcp.mcp.tools.conflict.get_credentials")
+    def test_check_availability_not_authenticated(self, mock_get_credentials):
+        """Test check_attendee_availability when not authenticated."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_get_credentials.return_value = None
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        check_attendee_availability = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "check_attendee_availability":
+                check_attendee_availability = tool.fn
+                break
+
+        result = check_attendee_availability(
+            attendees=["alice@example.com"],
+            start_date="2024-01-15",
+            end_date="2024-01-19"
+        )
+
+        assert "error" in result
+        assert "Not authenticated" in result["error"]
+
+    @patch("gmail_mcp.mcp.tools.conflict.get_credentials")
+    def test_check_availability_no_attendees(self, mock_get_credentials):
+        """Test check_attendee_availability with empty attendees list."""
+        from gmail_mcp.mcp.tools import setup_tools
+        from mcp.server.fastmcp import FastMCP
+
+        mock_credentials = Mock()
+        mock_get_credentials.return_value = mock_credentials
+
+        mcp = FastMCP(name="Test")
+        setup_tools(mcp)
+
+        check_attendee_availability = None
+        for tool in mcp._tool_manager._tools.values():
+            if tool.name == "check_attendee_availability":
+                check_attendee_availability = tool.fn
+                break
+
+        result = check_attendee_availability(
+            attendees=[],
+            start_date="2024-01-15",
+            end_date="2024-01-19"
+        )
+
+        assert result["success"] is False
+        assert "At least one attendee" in result["error"]

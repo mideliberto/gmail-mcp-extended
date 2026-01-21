@@ -57,6 +57,12 @@ def get_scopes() -> list:
         ])
         scopes.extend(calendar_scopes)
 
+    # Add People API (Contacts) scope if enabled
+    if config.get("contacts_api_enabled", False):
+        contacts_scope = "https://www.googleapis.com/auth/contacts.readonly"
+        if contacts_scope not in scopes:
+            scopes.append(contacts_scope)
+
     # Always include user info scopes
     user_info_scopes = [
         "https://www.googleapis.com/auth/userinfo.email",

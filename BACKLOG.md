@@ -19,10 +19,12 @@
 
 | Priority | Items |
 |----------|-------|
-| **High** | Draft Management, Scheduled Send |
-| **Medium** | Retention Labels, Unsubscribe Management, Attendee Free/Busy, Contact Lookup, Event Reminders |
-| **Low** | Vacation Responder, Travel Time, DST Handling |
+| **High** | Contact Hygiene (#24-28) |
+| **Medium** | Unsubscribe Management, Contact Bulk Ops (#29-32) |
+| **Low** | Travel Time, DST Handling, Contact CRUD (#33-35) |
 | **Future** | Google Drive Integration |
+
+**Recently Completed (2026-01-21):** Scheduled Send (#13), Attendee Free/Busy (#15), Event Reminders (#16), Contact Lookup (#18), Vacation Responder (#14), Tests & Docs for all
 
 ---
 
@@ -81,132 +83,76 @@ Implemented full thread/conversation view support with three new tools:
 
 ---
 
-### 12. Draft Management
-**Priority:** High
-**Issue:** Can create drafts but can't list, edit, or delete existing ones.
+### 12. ✅ IMPLEMENTED - Draft Management (2026-01-21)
+Full draft lifecycle management implemented.
 
-**Current behavior:**
-- `compose_email()` creates draft
-- `send_email_reply()` creates draft
-- No way to manage drafts after creation
+**New tools:**
+- `list_drafts(max_results=10)` - List all drafts with basic info
+- `get_draft(draft_id)` - Get full draft content
+- `update_draft(draft_id, to=None, subject=None, body=None, cc=None, bcc=None)` - Update existing draft
+- `delete_draft(draft_id)` - Permanently delete a draft
 
-**Desired behavior:**
-```python
-list_drafts(max_results=10)  # List all drafts
-get_draft(draft_id="...")  # Get draft content
-update_draft(draft_id="...", body="...", subject="...")  # Edit draft
-delete_draft(draft_id="...")  # Delete draft
-```
-
-**Implementation:**
-- New file: `gmail_mcp/mcp/tools/email_drafts.py`
-- Uses Gmail API `drafts()` resource
-- Functions:
-  - `list_drafts(max_results: int = 10) -> Dict`
-  - `get_draft(draft_id: str) -> Dict`
-  - `update_draft(draft_id: str, to: str = None, subject: str = None, body: str = None) -> Dict`
-  - `delete_draft(draft_id: str) -> Dict`
+**Features:**
+- Preserves unchanged fields when updating (only specified fields change)
+- Returns full draft details after update
+- Pagination support for list_drafts
 
 **Files:**
-- `gmail_mcp/mcp/tools/email_drafts.py` (new)
-- `tests/test_email_drafts.py` (new)
-
-**Estimated scope:** ~150 lines code, ~80 lines tests
+- `gmail_mcp/mcp/tools/email_drafts.py` (new - ~280 lines)
+- `tests/test_email_drafts.py` (new - 11 tests)
 
 ---
 
-### 13. Scheduled Send
-**Priority:** High
-**Issue:** Can't schedule emails to send later.
+### 13. ✅ IMPLEMENTED - Scheduled Send (2026-01-21)
+Schedule emails to send later using draft + calendar reminder approach.
 
-**Current behavior:**
-- Emails send immediately after confirmation
-
-**Desired behavior:**
+**New parameter on compose_email:**
 ```python
 compose_email(to="...", subject="...", body="...", send_at="tomorrow 8am")
-compose_email(to="...", subject="...", body="...", send_at="2026-01-25T09:00:00")
 ```
 
-**Implementation:**
-- Gmail API doesn't have native scheduled send via API
-- **Workaround options:**
-  1. Create draft + calendar reminder to send (hacky)
-  2. Use Gmail's native schedule feature via SMTP (limited)
-  3. Store locally and use cron/scheduler (requires persistent service)
+**How it works:**
+1. Creates email as draft
+2. Creates calendar event at scheduled time: "📧 Send email: [subject]"
+3. Event description includes draft link and instructions
+4. User receives reminder and sends manually (or Claude sends when reminded)
 
-- **Recommended approach:** Option 1 for now
-  - Create draft
-  - Create calendar event as reminder: "Send email: [subject]"
-  - Include draft link in event description
-  - User manually sends or Claude sends when reminded
-
-- **Future:** If Gmail API adds scheduled send support, switch to native
+**Note:** Gmail API doesn't support native scheduled send - this is the workaround approach.
 
 **Files:**
-- `gmail_mcp/mcp/tools/email_compose.py` (update compose_email)
-- `gmail_mcp/mcp/tools/calendar.py` (helper to create send reminder)
-
-**Estimated scope:** ~50 lines code (workaround approach)
+- `gmail_mcp/mcp/tools/email_send.py` (updated compose_email with send_at parameter)
 
 ---
 
-### 21. Retention Labels & Automated Cleanup
-**Priority:** Medium
-**Issue:** No structured way to manage email retention policies.
+### 21. ✅ IMPLEMENTED - Retention Labels & Automated Cleanup (2026-01-21)
+Automated email retention policy enforcement.
 
-**Concept:**
-1. Create retention labels (e.g., `Retention/7-days`, `Retention/30-days`, `Retention/1-year`)
-2. Apply to newsletters, notifications, receipts, etc.
-3. Claude workflow to periodically delete emails past their retention window
+**New tools:**
+- `setup_retention_labels()` - Creates standard retention labels if they don't exist
+- `enforce_retention_policies(dry_run=True, max_emails_per_label=100)` - Enforces retention policies
+- `get_retention_status()` - Shows current status of all retention labels
 
-**Implementation:**
+**Features:**
+- Dry run mode by default (safe preview before deletion)
+- Supports 6 retention periods: 7-days, 30-days, 90-days, 6-months, 1-year, 3-years
+- Per-label breakdown of expired email counts
+- Graceful handling of missing labels
 
-**Phase 1: Label Setup**
+**Usage:**
 ```python
-setup_retention_labels()
-# Creates:
-# - Retention/7-days
-# - Retention/30-days
-# - Retention/90-days
-# - Retention/1-year
-# - Retention/Forever (never auto-delete)
-```
-
-**Phase 2: Retention Enforcement**
-```python
+# Preview what would be deleted
 enforce_retention_policies(dry_run=True)
-# Scans each retention label
-# Finds emails older than retention period
-# dry_run=True: Reports what would be deleted
-# dry_run=False: Actually deletes (with confirmation)
 
-# Returns:
-{
-  "7-days": {"count": 45, "oldest": "2026-01-10"},
-  "30-days": {"count": 12, "oldest": "2025-12-15"},
-  ...
-}
+# Actually delete expired emails
+enforce_retention_policies(dry_run=False)
+
+# Check retention status
+get_retention_status()
 ```
-
-**Phase 3: Filter Integration**
-```python
-create_retention_filter(
-    from_address="notifications@github.com",
-    retention="30-days",
-    archive=True  # Skip inbox, apply retention label
-)
-```
-
-**Claude Workflow:**
-- Weekly prompt: "Run retention cleanup - show me what's expiring, confirm before delete"
-- Can be added to `/daily` workflow as optional step
 
 **Files:**
-- `gmail_mcp/mcp/tools/email_retention.py` (new)
-- `tests/test_email_retention.py` (new)
-
-**Estimated scope:** ~150 lines code, ~60 lines tests
+- `gmail_mcp/mcp/tools/email_retention.py` (new - ~300 lines)
+- `tests/test_email_retention.py` (new - 10 tests)
 
 ---
 
@@ -290,104 +236,89 @@ setup_subscription_labels()
 
 ---
 
-### 14. Vacation Responder / Out of Office
-**Priority:** Low
-**Issue:** Can't set up auto-reply when away.
+### 14. ✅ IMPLEMENTED - Vacation Responder (2026-01-21)
+Vacation responder / out of office auto-reply.
 
-**Desired behavior:**
+**New tools:**
+- `set_vacation_responder(subject, message, start_date, end_date, contacts_only, domain_only)` - Enable vacation responder
+- `get_vacation_responder()` - Check current status
+- `disable_vacation_responder()` - Disable vacation responder
+
+**Usage:**
 ```python
 set_vacation_responder(
-    enabled=True,
-    start_date="2026-02-01",
-    end_date="2026-02-07",
     subject="Out of Office",
-    message="I'm away until Feb 7. For urgent matters, contact...",
-    contacts_only=False
+    message="I'm away until Feb 7. For urgent matters, contact backup@co.com",
+    start_date="tomorrow",
+    end_date="next friday"
 )
-get_vacation_responder()  # Check current status
-disable_vacation_responder()
 ```
 
-**Implementation:**
-- Uses Gmail API `settings.updateVacation()`
-- https://developers.google.com/gmail/api/reference/rest/v1/users.settings/updateVacation
-
 **Files:**
-- `gmail_mcp/mcp/tools/email_settings.py` (new)
-- `tests/test_email_settings.py` (new)
-
-**Estimated scope:** ~80 lines code, ~40 lines tests
+- `gmail_mcp/mcp/tools/email_settings.py` (new - ~200 lines)
 
 ---
 
 ## Calendar Features
 
-### 15. Attendee Free/Busy Query
-**Priority:** Medium
-**Issue:** Can check own availability but not others'.
+### 15. ✅ IMPLEMENTED - Attendee Free/Busy Query (2026-01-21)
+Check availability of multiple attendees and find common free times.
 
-**Current behavior:**
-- `find_free_time()` checks user's calendars only
-- `suggest_meeting_times()` only considers user's schedule
-
-**Desired behavior:**
+**New tool:**
 ```python
-check_availability(
+check_attendee_availability(
     attendees=["bob@company.com", "alice@company.com"],
-    start="tomorrow",
-    end="friday",
+    start_date="tomorrow",
+    end_date="friday",
     duration="1 hour"
 )
 # Returns times when ALL attendees are free
 ```
 
-**Implementation:**
-- Uses Calendar API `freebusy.query()`
-- https://developers.google.com/calendar/api/v3/reference/freebusy/query
-- Note: Only works for attendees who share their calendar or are in same org
+**Features:**
+- Uses Calendar API `freebusy.query()` for efficient batch lookup
+- Finds common free slots within working hours
+- Excludes weekends by default
+- Shows individual availability breakdown
+
+**Note:** Only works for attendees who share their calendar or are in same org.
 
 **Files:**
-- `gmail_mcp/mcp/tools/conflict.py` (add check_availability)
-- `tests/test_conflict.py`
-
-**Estimated scope:** ~100 lines code, ~50 lines tests
+- `gmail_mcp/mcp/tools/conflict.py` (added check_attendee_availability)
 
 ---
 
-### 16. Event Reminders/Notifications
-**Priority:** Medium
-**Issue:** Events use default reminder settings, can't customize per-event.
+### 16. ✅ IMPLEMENTED - Event Reminders (2026-01-21)
+Custom per-event reminders on calendar events.
 
-**Current behavior:**
-```python
-create_calendar_event(summary="...", start_time="...")  # Uses default reminders
-```
-
-**Desired behavior:**
+**New `reminders` parameter on all calendar event functions:**
 ```python
 create_calendar_event(
     summary="...",
     start_time="...",
-    reminders=[
-        {"method": "popup", "minutes": 30},
-        {"method": "email", "minutes": 1440}  # 1 day before
-    ]
+    reminders=["30 minutes", "1 day before by email"]
 )
-# Or NLP:
-create_calendar_event(..., remind_me="30 minutes before and 1 day before by email")
+
+# Also supports dict format:
+create_calendar_event(
+    summary="...",
+    start_time="...",
+    reminders=[{"method": "popup", "minutes": 30}, {"method": "email", "minutes": 1440}]
+)
 ```
 
-**Implementation:**
-- Add `reminders` parameter to `create_calendar_event()` and `update_calendar_event()`
-- Parse NLP reminder strings: "30 minutes before", "1 hour before", "1 day before by email"
-- Map to Google Calendar reminder format
+**Supported formats:**
+- `"30 minutes"` or `"30 minutes before"` - popup reminder
+- `"1 hour before by email"` - email reminder
+- `"1 day"`, `"2 weeks"` - any time unit
+
+**Works with:**
+- `create_calendar_event()`
+- `create_recurring_event()`
+- `update_calendar_event()`
 
 **Files:**
-- `gmail_mcp/mcp/tools/calendar.py`
-- `gmail_mcp/utils/date_parser.py` (add parse_reminder)
-- `tests/test_calendar_tools.py`
-
-**Estimated scope:** ~80 lines code, ~40 lines tests
+- `gmail_mcp/mcp/tools/calendar.py` (added _parse_reminder helper, updated all event functions)
 
 ---
 
@@ -427,42 +358,496 @@ create_calendar_event(
 
 ## Contact Integration
 
-### 18. Contact Lookup
-**Priority:** Medium
-**Issue:** No access to Google Contacts.
+### 18. ✅ IMPLEMENTED - Contact Lookup (2026-01-21)
+Google Contacts access via People API.
 
-**Desired behavior:**
+**New tools:**
 ```python
-search_contacts(query="Bob Smith")  # Find contacts by name
-get_contact(email="bob@company.com")  # Get contact details
 list_contacts(max_results=50)  # List all contacts
+search_contacts(query="Bob Smith")  # Find contacts by name, email, company
+get_contact(email="bob@company.com")  # Get contact details by email
 ```
 
-**Returns:**
-```json
+**Returns contact info:**
+- name, given_name, family_name
+- emails (list), primary email
+- phones (list), primary phone
+- organization, title, department
+- addresses
+- notes, photo_url
+
+**Configuration:**
+Requires `contacts_api_enabled: true` in config and re-authentication to grant scope.
+
+**Files:**
+- `gmail_mcp/utils/services.py` (added get_people_service)
+- `gmail_mcp/mcp/tools/contacts.py` (new - ~250 lines)
+- `gmail_mcp/auth/oauth.py` (added contacts scope when enabled)
+
+---
+
+## Contact Management
+
+**Prerequisite:** Upgrade from `contacts.readonly` to `contacts` scope (full read/write).
+
+### 24. Find Duplicate Contacts
+**Priority:** High
+**Status:** Planned
+
+Detect contacts that may be duplicates based on name, email, or phone.
+
+**Proposed tool:**
+```python
+find_duplicate_contacts(
+    threshold: float = 0.8,  # Similarity threshold
+    max_results: int = 50
+) -> Dict[str, Any]
+
+# Returns:
 {
-  "name": "Bob Smith",
-  "email": "bob@company.com",
-  "phone": "+1-555-123-4567",
-  "organization": "Acme Corp",
-  "title": "Director of Engineering",
-  "notes": "Met at conference 2025"
+  "success": True,
+  "duplicate_groups": [
+    {
+      "contacts": [
+        {"resource_name": "people/c123", "name": "John Smith", "email": "john@example.com"},
+        {"resource_name": "people/c456", "name": "John R Smith", "email": "john@example.com"}
+      ],
+      "match_reason": "Same email address",
+      "confidence": 1.0
+    },
+    {
+      "contacts": [...],
+      "match_reason": "Similar name",
+      "confidence": 0.85
+    }
+  ],
+  "total_groups": 5
+}
+```
+
+**Matching criteria (in order of confidence):**
+1. Exact email match (confidence: 1.0)
+2. Exact phone match (confidence: 1.0)
+3. Very similar name + same domain (confidence: 0.9)
+4. Similar name (Levenshtein distance) (confidence: 0.7-0.9)
+
+**Implementation notes:**
+- Use `contacts.readonly` scope (can implement now!)
+- Fuzzy name matching with `difflib.SequenceMatcher` or `fuzzywuzzy`
+- Group by highest-confidence match first
+
+**Files:**
+- `gmail_mcp/mcp/tools/contacts.py` (extend)
+
+**Estimated scope:** ~100 lines
+
+---
+
+### 25. Merge Contacts
+**Priority:** High
+**Status:** Planned
+**Requires:** `contacts` scope (read/write)
+
+Combine two or more contacts into one, preserving all unique information.
+
+**Proposed tool:**
+```python
+merge_contacts(
+    resource_names: List[str],  # List of contact resource names to merge
+    primary: str = None,  # Which contact to keep as primary (others deleted)
+    dry_run: bool = True  # Preview merge without executing
+) -> Dict[str, Any]
+
+# Returns:
+{
+  "success": True,
+  "merged_contact": {
+    "resource_name": "people/c123",
+    "name": "John Smith",
+    "emails": ["john@work.com", "john@personal.com"],  # Combined
+    "phones": ["+1-555-1234", "+1-555-5678"],  # Combined
+    ...
+  },
+  "contacts_removed": ["people/c456", "people/c789"],
+  "dry_run": True
+}
+```
+
+**Merge logic:**
+- Keep primary contact's name (or most complete name)
+- Combine all unique emails, phones, addresses
+- Combine notes (concatenate with separator)
+- Keep most recent photo
+- Preserve all organization info
+
+**Files:**
+- `gmail_mcp/mcp/tools/contacts.py` (extend)
+
+**Estimated scope:** ~150 lines
+
+---
+
+### 26. Find Stale Contacts
+**Priority:** High
+**Status:** Planned
+
+Find contacts you haven't emailed (sent or received) in N months.
+
+**Proposed tool:**
+```python
+find_stale_contacts(
+    months: int = 12,  # No email activity in this many months
+    max_results: int = 100
+) -> Dict[str, Any]
+
+# Returns:
+{
+  "success": True,
+  "stale_contacts": [
+    {
+      "resource_name": "people/c123",
+      "name": "Old Colleague",
+      "email": "old@company.com",
+      "last_email_date": "2024-06-15",  # Last sent/received
+      "months_inactive": 18
+    },
+    ...
+  ],
+  "total_stale": 45
 }
 ```
 
 **Implementation:**
-- Uses Google People API (not Gmail API)
-- https://developers.google.com/people/api/rest
-- Requires additional OAuth scope: `https://www.googleapis.com/auth/contacts.readonly`
-- New service initialization in `services.py`
+1. Get all contacts with email addresses
+2. For each, search Gmail: `from:{email} OR to:{email} after:{cutoff_date}`
+3. Contacts with no results are stale
+
+**Note:** Can use `contacts.readonly` scope + `gmail.readonly` - implementable now!
 
 **Files:**
-- `gmail_mcp/utils/services.py` (add People API service)
-- `gmail_mcp/mcp/tools/contacts.py` (new)
-- `gmail_mcp/auth/oauth.py` (add scope)
-- `tests/test_contacts.py` (new)
+- `gmail_mcp/mcp/tools/contacts.py` (extend)
 
-**Estimated scope:** ~150 lines code, ~60 lines tests
+**Estimated scope:** ~80 lines
+
+---
+
+### 27. Enrich Contact from Email
+**Priority:** High
+**Status:** Planned
+
+Extract contact details from email signatures and update contacts.
+
+**Proposed tool:**
+```python
+enrich_contact_from_email(
+    email_id: str,  # Email to extract signature from
+    contact_email: str = None,  # Which contact to update (default: sender)
+    dry_run: bool = True
+) -> Dict[str, Any]
+
+# Returns:
+{
+  "success": True,
+  "extracted_info": {
+    "phone": "+1-555-123-4567",
+    "title": "Senior Engineer",
+    "company": "Acme Corp",
+    "address": "123 Main St, San Francisco, CA"
+  },
+  "contact_before": {...},
+  "contact_after": {...},
+  "fields_updated": ["phone", "title"],
+  "dry_run": True
+}
+```
+
+**Signature parsing patterns:**
+- Phone: Various formats (+1, parentheses, dashes)
+- Title/Company: "Title at Company" or "Title | Company"
+- Address: Multi-line address patterns
+- LinkedIn/Twitter URLs
+
+**Files:**
+- `gmail_mcp/mcp/tools/contacts.py` (extend)
+- `gmail_mcp/utils/signature_parser.py` (new - regex patterns)
+
+**Estimated scope:** ~200 lines (parsing is complex)
+
+---
+
+### 28. Find Incomplete Contacts
+**Priority:** High
+**Status:** Planned
+
+Find contacts missing key information (email, phone, etc.).
+
+**Proposed tool:**
+```python
+find_incomplete_contacts(
+    require_email: bool = True,
+    require_phone: bool = False,
+    require_organization: bool = False,
+    max_results: int = 100
+) -> Dict[str, Any]
+
+# Returns:
+{
+  "success": True,
+  "incomplete_contacts": [
+    {
+      "resource_name": "people/c123",
+      "name": "Bob Someone",
+      "missing_fields": ["phone", "organization"],
+      "has_email": True,
+      "has_phone": False,
+      "has_organization": False
+    },
+    ...
+  ],
+  "total_incomplete": 23
+}
+```
+
+**Note:** Can use `contacts.readonly` scope - implementable now!
+
+**Files:**
+- `gmail_mcp/mcp/tools/contacts.py` (extend)
+
+**Estimated scope:** ~50 lines
+
+---
+
+### 29. Bulk Update Contacts
+**Priority:** Medium
+**Status:** Planned
+**Requires:** `contacts` scope (read/write)
+
+Update a field across multiple contacts (e.g., company rename).
+
+**Proposed tool:**
+```python
+bulk_update_contacts(
+    resource_names: List[str] = None,  # Specific contacts, or...
+    query: str = None,  # Search query to find contacts
+    updates: Dict[str, str] = {},  # Fields to update
+    dry_run: bool = True
+) -> Dict[str, Any]
+
+# Example: Company renamed
+bulk_update_contacts(
+    query="Acme Corp",  # Find all contacts at old company
+    updates={"organization": "Acme Industries"},
+    dry_run=False
+)
+
+# Returns:
+{
+  "success": True,
+  "contacts_updated": 15,
+  "contacts": [...],
+  "dry_run": False
+}
+```
+
+**Files:**
+- `gmail_mcp/mcp/tools/contacts.py` (extend)
+
+**Estimated scope:** ~80 lines
+
+---
+
+### 30. Import Contacts
+**Priority:** Medium
+**Status:** Planned
+**Requires:** `contacts` scope (read/write)
+
+Import contacts from CSV or vCard file.
+
+**Proposed tool:**
+```python
+import_contacts(
+    file_path: str,  # Path to CSV or vCard file
+    format: str = "auto",  # "csv", "vcard", or "auto" (detect)
+    dry_run: bool = True,
+    skip_duplicates: bool = True  # Skip if email already exists
+) -> Dict[str, Any]
+
+# Returns:
+{
+  "success": True,
+  "imported": 45,
+  "skipped_duplicates": 3,
+  "errors": [
+    {"row": 12, "error": "Invalid email format"}
+  ],
+  "dry_run": True
+}
+```
+
+**CSV format expected:**
+```
+Name,Email,Phone,Company,Title
+John Smith,john@example.com,555-1234,Acme,Engineer
+```
+
+**Files:**
+- `gmail_mcp/mcp/tools/contacts.py` (extend)
+- May need `vobject` package for vCard parsing
+
+**Estimated scope:** ~150 lines
+
+---
+
+### 31. Export Contacts
+**Priority:** Medium
+**Status:** Planned
+
+Export contacts to CSV or vCard for backup.
+
+**Proposed tool:**
+```python
+export_contacts(
+    file_path: str,  # Where to save
+    format: str = "csv",  # "csv" or "vcard"
+    query: str = None,  # Optional filter
+    max_results: int = 1000
+) -> Dict[str, Any]
+
+# Returns:
+{
+  "success": True,
+  "exported": 156,
+  "file_path": "/path/to/contacts.csv",
+  "format": "csv"
+}
+```
+
+**Note:** Can use `contacts.readonly` scope - implementable now!
+
+**Files:**
+- `gmail_mcp/mcp/tools/contacts.py` (extend)
+
+**Estimated scope:** ~80 lines
+
+---
+
+### 32. Contact Groups (Labels)
+**Priority:** Medium
+**Status:** Planned
+**Requires:** `contacts` scope (read/write)
+
+Manage contact groups for organization.
+
+**Proposed tools:**
+```python
+list_contact_groups() -> Dict[str, Any]
+# Returns all contact groups with member counts
+
+create_contact_group(name: str) -> Dict[str, Any]
+
+add_contacts_to_group(
+    group_resource_name: str,
+    contact_resource_names: List[str]
+) -> Dict[str, Any]
+
+remove_contacts_from_group(
+    group_resource_name: str,
+    contact_resource_names: List[str]
+) -> Dict[str, Any]
+
+delete_contact_group(group_resource_name: str) -> Dict[str, Any]
+```
+
+**Files:**
+- `gmail_mcp/mcp/tools/contacts.py` (extend)
+
+**Estimated scope:** ~120 lines
+
+---
+
+### 33. Create Contact
+**Priority:** Low
+**Status:** Planned
+**Requires:** `contacts` scope (read/write)
+
+Create a new contact.
+
+**Proposed tool:**
+```python
+create_contact(
+    name: str,
+    email: str = None,
+    phone: str = None,
+    organization: str = None,
+    title: str = None,
+    notes: str = None
+) -> Dict[str, Any]
+
+# Returns:
+{
+  "success": True,
+  "contact": {
+    "resource_name": "people/c123456",
+    "name": "New Person",
+    ...
+  }
+}
+```
+
+**Files:**
+- `gmail_mcp/mcp/tools/contacts.py` (extend)
+
+**Estimated scope:** ~50 lines
+
+---
+
+### 34. Update Contact
+**Priority:** Low
+**Status:** Planned
+**Requires:** `contacts` scope (read/write)
+
+Update an existing contact.
+
+**Proposed tool:**
+```python
+update_contact(
+    resource_name: str,  # Or email to lookup
+    email: str = None,
+    name: str = None,
+    phone: str = None,
+    organization: str = None,
+    title: str = None,
+    notes: str = None,
+    append_notes: bool = False  # Append to existing notes vs replace
+) -> Dict[str, Any]
+```
+
+**Files:**
+- `gmail_mcp/mcp/tools/contacts.py` (extend)
+
+**Estimated scope:** ~60 lines
+
+---
+
+### 35. Delete Contact
+**Priority:** Low
+**Status:** Planned
+**Requires:** `contacts` scope (read/write)
+
+Delete a contact.
+
+**Proposed tool:**
+```python
+delete_contact(
+    resource_name: str = None,
+    email: str = None  # Lookup by email if resource_name not provided
+) -> Dict[str, Any]
+```
+
+**Files:**
+- `gmail_mcp/mcp/tools/contacts.py` (extend)
+
+**Estimated scope:** ~30 lines
 
 ---
 
@@ -675,9 +1060,16 @@ tests/
 
 ## Test Baseline
 
-As of 2026-01-19 (post-thread-view & bulk-fix):
+As of 2026-01-21 (post-tests-and-docs):
 ```
-273 passed, 4 warnings
+349 passed, 5 warnings
 ```
 
 Warnings are dateparser deprecation notices (upstream issue, not actionable).
+
+**Test additions (2026-01-21):**
+- `test_contacts.py` - 11 tests for contact lookup
+- `test_email_settings.py` - 11 tests for vacation responder
+- `test_tools.py` - 5 tests for scheduled send
+- `test_calendar_tools.py` - 17 tests for reminder parsing
+- `test_conflict.py` - 5 tests for attendee availability
