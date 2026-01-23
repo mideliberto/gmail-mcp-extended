@@ -33,7 +33,11 @@
 
 | Priority | Items | Status |
 |----------|-------|--------|
-| **Done** | All backlog items | ✅ Completed 2026-01-22 |
+| **P1 - High** | Calendar get/duplicate (#47-48) | Pending |
+| **P2 - Medium** | Drive star/comments (#39-43) | Pending |
+| **P3 - Low** | Drive shared drives admin (#36-38) | Pending (Workspace only) |
+| **P3 - Low** | Drive revisions (#44-46) | Pending |
+| **P3 - Low** | PDF advanced (#49-53) | Pending |
 
 ---
 
@@ -92,7 +96,45 @@
 
 ## Remaining Items
 
-**Backlog cleared!** All planned features have been implemented.
+### drive-mcp - Shared Drives (#36-38)
+
+*Requires Google Workspace admin permissions*
+
+- [ ] `create_shared_drive` - Create a new shared drive
+- [ ] `delete_shared_drive` - Delete a shared drive
+- [ ] `update_shared_drive` - Update shared drive name/settings
+
+### drive-mcp - File Actions (#39-40)
+
+- [ ] `star_drive_file` - Star a file for quick access
+- [ ] `unstar_drive_file` - Remove star from file
+
+### drive-mcp - Comments (#41-43)
+
+- [ ] `list_comments` - List comments on a file
+- [ ] `add_comment` - Add comment to a file
+- [ ] `delete_comment` - Delete a comment
+
+### drive-mcp - Revisions (#44-46)
+
+- [ ] `list_revisions` - List file version history
+- [ ] `get_revision` - Get specific revision metadata
+- [ ] `download_revision` - Download a previous version
+
+### gmail-mcp - Calendar (#47-48)
+
+- [ ] `get_calendar_event` - Get single event by ID (currently have list/update but not get)
+- [ ] `duplicate_calendar_event` - Quick copy of an event
+
+### docs-mcp - PDF Advanced (#49-53)
+
+- [ ] `rotate_pdf` - Rotate pages in a PDF
+- [ ] `compress_pdf` - Reduce PDF file size
+- [ ] `add_watermark` - Add watermark to PDF pages
+- [ ] `encrypt_pdf` - Password-protect a PDF
+- [ ] `decrypt_pdf` - Remove password from PDF
+
+---
 
 ### Future Ideas (not planned)
 
