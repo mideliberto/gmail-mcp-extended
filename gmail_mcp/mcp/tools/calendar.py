@@ -1066,3 +1066,151 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
         except Exception as e:
             logger.error(f"Failed to RSVP: {e}")
             return {"success": False, "error": f"Failed to RSVP: {e}"}
+
+    @mcp.tool()
+    def add_travel_buffer(
+        event_id: str,
+        minutes: int = 30,
+        label: str = "Travel time"
+    ) -> Dict[str, Any]:
+        """
+        Add a travel buffer event before an existing calendar event.
+
+        Creates a blocking event immediately before the specified event to
+        account for travel time. Useful for ensuring you have time to get
+        to meetings.
+
+        Args:
+            event_id (str): The ID of the event to add a buffer before
+            minutes (int, optional): Duration of travel buffer in minutes. Defaults to 30.
+            label (str, optional): Label for the buffer event. Defaults to "Travel time".
+                The main event's title will be appended automatically.
+
+        Returns:
+            Dict[str, Any]: Result including:
+                - success: Whether the operation was successful
+                - buffer_event_id: ID of the created buffer event
+                - buffer_event_link: Link to the buffer event
+                - main_event: Details of the main event
+
+        Example usage:
+        1. Add 30-minute buffer before a meeting:
+           add_travel_buffer(event_id="abc123")
+
+        2. Add 45-minute commute buffer:
+           add_travel_buffer(event_id="abc123", minutes=45, label="Commute to")
+
+        3. Add buffer with custom label:
+           add_travel_buffer(event_id="abc123", minutes=15, label="Walk to")
+        """
+        credentials = get_credentials()
+
+        if not credentials:
+            return {"success": False, "error": "Not authenticated. Please use the authenticate tool first."}
+
+        try:
+            service = get_calendar_service(credentials)
+
+            # Get the target event
+            event = service.events().get(calendarId="primary", eventId=event_id).execute()
+
+            event_summary = event.get("summary", "Event")
+            start = event.get("start", {})
+
+            # Parse the start time
+            if "dateTime" in start:
+                start_dt = parser.parse(start["dateTime"])
+                timezone_str = start.get("timeZone", get_user_timezone())
+            elif "date" in start:
+                # All-day event - buffer before start of day doesn't make much sense
+                return {
+                    "success": False,
+                    "error": "Cannot add travel buffer to all-day events. Travel buffers work best with timed events."
+                }
+            else:
+                return {"success": False, "error": "Could not determine event start time."}
+
+            # Calculate buffer time slot (ends when main event starts)
+            buffer_end = start_dt
+            buffer_start = start_dt - timedelta(minutes=minutes)
+
+            # Create the buffer event
+            buffer_summary = f"{label} - {event_summary}"
+            buffer_body = {
+                "summary": buffer_summary,
+                "start": {
+                    "dateTime": buffer_start.isoformat(),
+                    "timeZone": timezone_str
+                },
+                "end": {
+                    "dateTime": buffer_end.isoformat(),
+                    "timeZone": timezone_str
+                },
+                "description": f"Travel buffer for: {event_summary}",
+                "colorId": "8",  # Gray color for travel/buffer events
+                "reminders": {
+                    "useDefault": False,
+                    "overrides": []  # No reminders for travel buffers
+                }
+            }
+
+            # Check for conflicts
+            conflicts = service.events().list(
+                calendarId="primary",
+                timeMin=buffer_start.isoformat(),
+                timeMax=buffer_end.isoformat(),
+                singleEvents=True
+            ).execute().get("items", [])
+
+            # Filter out the main event from conflicts
+            conflicts = [c for c in conflicts if c.get("id") != event_id]
+
+            if conflicts:
+                conflict_names = [c.get("summary", "Untitled") for c in conflicts]
+                return {
+                    "success": False,
+                    "error": f"Travel buffer would conflict with existing events: {', '.join(conflict_names)}",
+                    "conflicts": [{"id": c.get("id"), "summary": c.get("summary")} for c in conflicts],
+                    "proposed_buffer": {
+                        "start": buffer_start.isoformat(),
+                        "end": buffer_end.isoformat(),
+                        "duration_minutes": minutes
+                    }
+                }
+
+            # Create the buffer event
+            created_buffer = service.events().insert(
+                calendarId="primary",
+                body=buffer_body
+            ).execute()
+
+            buffer_id = created_buffer.get("id", "")
+            buffer_link = created_buffer.get("htmlLink", "")
+
+            return {
+                "success": True,
+                "message": f"Added {minutes}-minute travel buffer before '{event_summary}'.",
+                "buffer_event_id": buffer_id,
+                "buffer_event_link": buffer_link,
+                "buffer_details": {
+                    "summary": buffer_summary,
+                    "start": buffer_start.isoformat(),
+                    "end": buffer_end.isoformat(),
+                    "duration_minutes": minutes
+                },
+                "main_event": {
+                    "id": event_id,
+                    "summary": event_summary,
+                    "start": start
+                }
+            }
+
+        except HttpError as e:
+            logger.error(f"Google Calendar API error adding travel buffer: {e}")
+            return {
+                "success": False,
+                "error": f"Calendar API error: {e.reason if hasattr(e, 'reason') else str(e)}"
+            }
+        except Exception as e:
+            logger.error(f"Failed to add travel buffer: {e}")
+            return {"success": False, "error": f"Failed to add travel buffer: {e}"}

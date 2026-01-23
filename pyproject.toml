@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gmail-mcp"
-version = "2.0.0"
+version = "2.2.0"
 description = "A Model Context Protocol (MCP) server for Gmail and Calendar integration with Claude Desktop"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -46,16 +46,23 @@ dev = [
     "ruff>=0.0.292",
 ]
 
+[project.scripts]
+gmail-mcp = "gmail_mcp.main:main"
+drive-mcp = "drive_mcp.main:main"
+docs-mcp = "docs_mcp.main:main"
+
 [project.urls]
 "Homepage" = "https://github.com/mideliberto/gmail-mcp-extended"
 "Bug Tracker" = "https://github.com/mideliberto/gmail-mcp-extended/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["gmail_mcp*"]
+include = ["gmail_mcp*", "drive_mcp*", "docs_mcp*", "shared*"]
 
 [tool.setuptools.package-data]
 gmail_mcp = ["py.typed", "*.pyi", "**/*.pyi"]
+drive_mcp = ["py.typed", "*.pyi", "**/*.pyi"]
+docs_mcp = ["py.typed", "*.pyi", "**/*.pyi"]
 
 [tool.black]
 line-length = 88

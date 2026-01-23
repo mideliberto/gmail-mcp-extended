@@ -1,214 +1,77 @@
 # Gmail MCP Extended
 
-Extended fork of [bastienchabal/gmail-mcp](https://github.com/bastienchabal/gmail-mcp) with comprehensive email and calendar management tools.
+Extended fork of [bastienchabal/gmail-mcp](https://github.com/bastienchabal/gmail-mcp) - now a **monorepo with three MCP servers** for comprehensive Google Workspace and document processing.
 
-**Version 2.0.0** - Major refactor with modular architecture, new features, and improved performance.
+**Version 2.2.0** - Monorepo architecture with Drive and Docs servers.
 
-## What's New in v2.0.0
+## Three MCP Servers
 
-### Vault Integration (Obsidian/Markdown)
-- `save_email_to_vault` - Save emails as markdown files with frontmatter
-- `batch_save_emails_to_vault` - Batch save multiple emails
-- Configurable vault path, inbox folder, and tags
-- Automatic attachment download support
+| Server | Tools | Google Auth | Use Case |
+|--------|-------|-------------|----------|
+| `gmail-mcp` | 93 | Yes | Email, Calendar, Contacts, Subscriptions |
+| `drive-mcp` | 43 | Yes | Google Drive files, folders, sharing, labels |
+| `docs-mcp` | 27 | No | Local DOCX/XLSX/PPTX/PDF processing, OCR, vault export |
+| **Total** | **163** | | |
 
-### Natural Language Date Parsing
-All calendar and email search functions now support rich NLP expressions:
-- Relative: `tomorrow`, `yesterday`, `day after tomorrow`
-- Days of week: `next monday`, `this wednesday`, `last friday`
-- Week ranges: `this week`, `next week`, `last week`, `past 7 days`
-- Numeric: `3 days ago`, `in 5 days`, `in 2 hours`
-- Combined: `tomorrow at 2pm`, `next monday at 10am`
-- Recurrence patterns: `every weekday`, `biweekly`, `daily for 2 weeks`
-- Working hours: `9am to 5pm`, `10-18`, `9am-5pm` (for find_free_time, suggest_meeting_times)
-- Duration: `1 hour`, `90 minutes`, `half hour` (for find_free_time, suggest_meeting_times)
-- Email search: `search_emails(query="...", date_range="last week")` or `after="last monday"`
-
-### Multi-Calendar Conflict Detection
-- `list_calendars` - List all accessible calendars
-- `check_conflicts` - Detect scheduling conflicts across calendars
-- `find_free_time` - Find available time slots across all calendars
-- `get_daily_agenda` - Unified view of events from all calendars
-- `check_attendee_availability` - Query freebusy for multiple attendees
-
-### Contact Lookup (People API)
-- `list_contacts` - List contacts from Google Contacts
-- `search_contacts` - Search contacts by name/email
-- `get_contact` - Get full contact details
-
-### Vacation Responder
-- `get_vacation_responder` - Check vacation auto-reply status
-- `set_vacation_responder` - Enable/configure vacation auto-reply
-- `disable_vacation_responder` - Turn off vacation auto-reply
-
-### Scheduled Send
-- `compose_email` now supports `send_at` parameter for scheduling
-- Creates draft + calendar reminder for manual send at scheduled time
-
-### Custom Event Reminders
-- `create_calendar_event`, `create_recurring_event`, `update_calendar_event` now support `reminders` parameter
-- Natural language reminders: `["30 minutes", "1 day before by email"]`
-
-### Gmail Filter Management
-- `list_filters` - View all Gmail filters
-- `create_filter` - Create new filters with criteria and actions
-- `delete_filter` - Remove filters
-- `get_filter` - Get details of a specific filter
-- `create_claude_review_filter` - Create filters that route emails to Claude review labels
-
-### Claude Review Label System
-- `setup_claude_review_labels` - Create Claude-specific labels for email triage
-- `get_emails_for_claude_review` - Get emails flagged for Claude attention
-- Pre-configured labels: Claude/Review, Claude/Urgent, Claude/Reply-Needed, Claude/Summarize, Claude/Action-Required
-
-### Performance Improvements
-- Gmail Batch API for list/search operations (N+1 query fix)
-- Service caching to reduce API calls
-- Modular code architecture for maintainability
-
----
-
-## All Features
-
-### Email Compose & Send
-- `compose_email` - Send new emails (supports `send_at` for scheduled send)
-- `forward_email` - Forward existing emails
-- `send_email_reply` - Create reply draft
-- `confirm_send_email` - Send after user confirmation
-- `prepare_email_reply` - Get context for crafting replies
-
-### Email Settings
-- `get_vacation_responder` - Get vacation auto-reply status
-- `set_vacation_responder` - Configure vacation auto-reply (supports NLP dates)
-- `disable_vacation_responder` - Disable vacation auto-reply
-
-### Contacts (People API)
-- `list_contacts` - List Google Contacts
-- `search_contacts` - Search contacts by query
-- `get_contact` - Get contact by email or resource ID
-
-### Email Organization
-- `archive_email` - Archive emails (remove from inbox)
-- `trash_email` - Move to trash
-- `delete_email` - Permanent delete
-- `star_email` / `unstar_email` - Star management
-- `mark_as_read` / `mark_as_unread` - Read status
-
-### Label Management
-- `list_labels` - Get all labels
-- `create_label` - Create new label with optional colors
-- `apply_label` / `remove_label` - Apply/remove labels from emails (supports fuzzy matching by name: `label="important"` instead of `label_id="Label_123"`)
-
-### Attachments
-- `get_attachments` - List attachments in an email
-- `download_attachment` - Save attachment to disk
-
-### Bulk Operations
-- `bulk_archive` - Archive all emails matching a query
-- `bulk_label` - Label all emails matching a query
-- `bulk_remove_label` - Remove a label from all emails matching a query
-- `bulk_trash` - Trash all emails matching a query
-- `cleanup_old_emails` - Archive old emails by age
-
-### Email Reading
-- `get_email_overview` - Quick summary of inbox
-- `list_emails` - List emails with pagination
-- `search_emails` - Search with Gmail query syntax (supports NLP dates: `date_range="last week"`, `after="3 days ago"`, `before="today"`)
-- `get_email` - Get full email details
-- `get_email_count` - Get inbox statistics
-
-### Calendar Management
-- `list_calendar_events` - View upcoming events (supports NLP: `time_min="tomorrow"`)
-- `create_calendar_event` - Create new events (supports NLP: `start_time="next monday at 2pm"`, custom `reminders`)
-- `create_recurring_event` - Create recurring events with RRULE or NLP (`recurrence_pattern="every weekday"`, custom `reminders`)
-- `update_calendar_event` - Modify existing events (supports custom `reminders`)
-- `delete_calendar_event` - Remove events
-- `rsvp_event` - Respond to invitations
-- `suggest_meeting_times` - Find available slots (supports NLP date ranges)
-- `detect_events_from_email` - Extract events from emails
-- `check_attendee_availability` - Query freebusy for attendee availability
-
-### Utilities
-- `find_unsubscribe_link` - Extract unsubscribe links from newsletters
-
-### Authentication
-- `check_auth_status` - Check if authenticated
-- `authenticate` - Start OAuth flow
-- `logout` - Revoke access
-
----
-
-## Installation
-
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/mideliberto/gmail-mcp-extended.git
-   cd gmail-mcp-extended
-   ```
-
-2. Set up a virtual environment:
-   ```bash
-   pip install uv
-   uv venv
-   source .venv/bin/activate
-   ```
-
-3. Install dependencies:
-   ```bash
-   uv pip install -e .
-   ```
-
-## Configuration
-
-> **📖 New to Google Cloud?** See [docs/setup.md](docs/setup.md) for a detailed step-by-step guide with explanations.
-
-### Google Cloud Setup (Quick Reference)
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a project and enable:
-   - [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
-   - [Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
-3. Configure OAuth consent screen (External, add your email as test user)
-4. Create OAuth 2.0 credentials (Desktop app)
-5. Add required scopes:
-   - `https://www.googleapis.com/auth/gmail.readonly`
-   - `https://www.googleapis.com/auth/gmail.send`
-   - `https://www.googleapis.com/auth/gmail.labels`
-   - `https://www.googleapis.com/auth/gmail.modify`
-   - `https://www.googleapis.com/auth/gmail.settings.basic` (for filters, vacation responder)
-   - `https://www.googleapis.com/auth/calendar.readonly`
-   - `https://www.googleapis.com/auth/calendar.events`
-   - `https://www.googleapis.com/auth/contacts.readonly` (for People API - contact lookup)
-
-### config.yaml
-
-Copy `config.yaml.example` to `config.yaml` and customize:
+### Deployment Flexibility
 
 ```yaml
-server:
-  host: localhost
-  port: 8000
-  debug: false
-  log_level: INFO
+# Personal use (email + calendar only)
+mcpServers:
+  gmail: gmail-mcp
 
-calendar:
-  enabled: true
+# Full suite (all Google + local docs)
+mcpServers:
+  gmail: gmail-mcp
+  drive: drive-mcp
+  docs: docs-mcp
 
-vault:
-  inbox_folder: 0-inbox
-  attachment_folder: attachments
-
-claude_review:
-  labels:
-    - name: Claude/Review
-      color: "#4986e7"
-    - name: Claude/Urgent
-      color: "#e66550"
+# Offline document work (no Google needed)
+mcpServers:
+  docs: docs-mcp
 ```
 
-### Claude Code / Claude Desktop Config
+---
 
-Add to your MCP config (`~/.claude/settings.json` for Claude Code):
+## Quick Start
+
+### Installation
+
+```bash
+git clone https://github.com/mideliberto/gmail-mcp-extended.git
+cd gmail-mcp-extended
+
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate
+
+# Install base package
+pip install -e .
+
+# For docs-mcp (local document processing)
+pip install python-docx openpyxl python-pptx pypdf pdfplumber pytesseract pdf2image Pillow
+
+# For OCR support (optional)
+brew install tesseract poppler  # macOS
+# apt install tesseract-ocr poppler-utils  # Linux
+```
+
+### Google Cloud Setup
+
+Required for `gmail-mcp` and `drive-mcp`. See [docs/setup.md](docs/setup.md) for detailed guide.
+
+1. Create project at [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable APIs:
+   - Gmail API
+   - Calendar API
+   - People API (contacts)
+   - Drive API (for drive-mcp)
+   - Drive Labels API (for drive-mcp labels)
+   - Drive Activity API (for drive-mcp activity)
+3. Create OAuth 2.0 credentials (Desktop app)
+4. Add scopes (see Configuration section below)
+
+### Claude Desktop / Claude Code Config
 
 ```json
 {
@@ -225,6 +88,26 @@ Add to your MCP config (`~/.claude/settings.json` for Claude Code):
         "TOKEN_ENCRYPTION_KEY": "<generate-a-random-key>",
         "VAULT_PATH": "/path/to/your/obsidian/vault"
       }
+    },
+    "drive-mcp": {
+      "command": "/path/to/gmail-mcp-extended/.venv/bin/mcp",
+      "args": ["run", "/path/to/gmail-mcp-extended/drive_mcp/main.py:mcp"],
+      "cwd": "/path/to/gmail-mcp-extended",
+      "env": {
+        "PYTHONPATH": "/path/to/gmail-mcp-extended",
+        "GOOGLE_CLIENT_ID": "<your-client-id>",
+        "GOOGLE_CLIENT_SECRET": "<your-client-secret>",
+        "TOKEN_ENCRYPTION_KEY": "<generate-a-random-key>"
+      }
+    },
+    "docs-mcp": {
+      "command": "/path/to/gmail-mcp-extended/.venv/bin/mcp",
+      "args": ["run", "/path/to/gmail-mcp-extended/docs_mcp/main.py:mcp"],
+      "cwd": "/path/to/gmail-mcp-extended",
+      "env": {
+        "PYTHONPATH": "/path/to/gmail-mcp-extended",
+        "VAULT_PATH": "/path/to/your/obsidian/vault"
+      }
     }
   }
 }
@@ -237,167 +120,360 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 
 ---
 
-## Usage Examples
+## Server 1: gmail-mcp (93 tools)
+
+Email, Calendar, Contacts, and Subscription management.
+
+### OAuth Scopes
 
 ```
-# Email
-"Send an email to john@example.com about the meeting"
-"Archive all emails from linkedin older than 7 days"
-"Find unsubscribe links in that newsletter"
-"Download the PDF attachment from the last email"
-
-# Labels & Filters
-"Create a label called 'Important' with red background"
-"Label all emails from my boss as 'Priority'"
-"Create a filter to route newsletters to Claude/Review"
-"Show me all my Gmail filters"
-
-# Calendar (with NLP date support)
-"What's on my calendar tomorrow?"
-"Show me events from next monday to next friday"
-"Accept the meeting invitation for tomorrow"
-"Move my dentist appointment to 3pm"
-"Do I have any conflicts day after tomorrow?"
-"Find a free hour for a meeting with John next week"
-"Create an event for next tuesday at 2pm"
-"Create a recurring standup every weekday at 9am"
-"Set up a biweekly 1:1 meeting starting next monday"
-
-# Vault Integration
-"Save this email to my vault"
-"Save all emails with attachments from this week to my vault"
-
-# Claude Review
-"Set up Claude review labels"
-"Show me emails that need my attention"
+https://www.googleapis.com/auth/gmail.readonly
+https://www.googleapis.com/auth/gmail.send
+https://www.googleapis.com/auth/gmail.labels
+https://www.googleapis.com/auth/gmail.modify
+https://www.googleapis.com/auth/gmail.settings.basic
+https://www.googleapis.com/auth/calendar.readonly
+https://www.googleapis.com/auth/calendar.events
+https://www.googleapis.com/auth/contacts.readonly
+https://www.googleapis.com/auth/contacts
 ```
+
+### Features
+
+#### Email (32 tools)
+
+**Reading & Search:**
+- `list_emails`, `search_emails`, `get_email`, `get_email_overview`, `get_email_count`
+- `get_thread`, `get_thread_summary`
+
+**Composing:**
+- `compose_email`, `forward_email`, `prepare_email_reply`, `send_email_reply`, `confirm_send_email`
+
+**Organization:**
+- `archive_email`, `trash_email`, `delete_email`, `star_email`, `unstar_email`
+- `mark_as_read`, `mark_as_unread`
+
+**Labels:**
+- `list_labels`, `create_label`, `delete_label`, `apply_label`, `remove_label`
+
+**Attachments:**
+- `get_attachments`, `download_attachment`
+
+**Bulk Operations:**
+- `bulk_archive`, `bulk_label`, `bulk_remove_label`, `bulk_trash`, `cleanup_old_emails`
+
+**Drafts:**
+- `list_drafts`, `get_draft`, `update_draft`, `delete_draft`
+
+**Filters:**
+- `list_filters`, `create_filter`, `delete_filter`, `get_filter`
+
+**Settings:**
+- `get_vacation_responder`, `set_vacation_responder`, `disable_vacation_responder`
+
+**Retention:**
+- `setup_retention_labels`, `enforce_retention_policies`, `get_retention_status`
+
+**Claude Review:**
+- `setup_claude_review_labels`, `get_emails_for_claude_review`, `create_claude_review_filter`
+
+#### Calendar (16 tools)
+
+**Events:**
+- `list_calendar_events`, `create_calendar_event`, `create_recurring_event`
+- `update_calendar_event`, `delete_calendar_event`, `rsvp_event`
+
+**Scheduling:**
+- `suggest_meeting_times`, `find_free_time`, `check_conflicts`, `check_attendee_availability`
+- `add_travel_buffer` - Add blocking travel time before meetings
+
+**Multi-Calendar:**
+- `list_calendars`, `get_daily_agenda`
+
+**Email Integration:**
+- `detect_events_from_email`
+
+#### Contacts (18 tools)
+
+**Basic (read-only):**
+- `list_contacts`, `search_contacts`, `get_contact`
+
+**CRUD (requires write scope):**
+- `create_contact`, `update_contact`, `delete_contact`
+
+**Hygiene:**
+- `find_duplicate_contacts` - Fuzzy matching for potential duplicates
+- `find_stale_contacts` - Contacts with no email activity in N months
+- `find_incomplete_contacts` - Contacts missing required fields
+- `merge_contacts` - Combine duplicate contacts
+- `enrich_contact_from_email` - Extract info from email signatures
+
+**Groups:**
+- `list_contact_groups`, `create_contact_group`, `delete_contact_group`
+- `add_contacts_to_group`, `remove_contacts_from_group`
+
+**Export:**
+- `export_contacts` - Export to CSV
+
+#### Subscriptions (6 tools)
+
+- `setup_subscription_labels` - Create Subscriptions/Review, Retained, Unsubscribed labels
+- `find_subscription_emails` - Find newsletter senders with unsubscribe links
+- `get_unsubscribe_link` - Extract unsubscribe link from email
+- `unsubscribe_and_cleanup` - Full unsubscribe workflow (get link, create filter, archive)
+- `create_subscription_filter` - Create filter for subscription sender (retain or junk)
+- `mark_sender_as_junk` - Filter sender to trash and report spam
+
+#### Vault Integration (2 tools)
+
+- `save_email_to_vault`, `batch_save_emails_to_vault`
+
+### NLP Date Support
+
+All date parameters support natural language:
+- `tomorrow`, `next monday`, `in 3 days`
+- `last week`, `past 7 days`, `this month`
+- `tomorrow at 2pm`, `next friday at 10am`
+- Recurrence: `every weekday`, `biweekly`, `daily for 2 weeks`
+
+---
+
+## Server 2: drive-mcp (43 tools)
+
+Google Drive file management. Shares OAuth tokens with gmail-mcp.
+
+### Additional OAuth Scopes
+
+```
+https://www.googleapis.com/auth/drive
+https://www.googleapis.com/auth/drive.labels
+https://www.googleapis.com/auth/drive.activity.readonly
+```
+
+### Features
+
+#### File Operations (12 tools)
+- `list_drive_files`, `search_drive_files`, `get_drive_file`, `read_drive_file`
+- `create_drive_file`, `update_drive_file`, `rename_drive_file`, `move_drive_file`
+- `copy_drive_file`, `trash_drive_file`, `restore_drive_file`, `delete_drive_file`
+
+#### Folders (3 tools)
+- `create_drive_folder`, `get_folder_tree`, `get_folder_path`
+
+#### Google Workspace Files (4 tools)
+- `create_google_doc`, `create_google_sheet`, `create_google_slides`, `export_google_file`
+
+#### Sharing & Permissions (6 tools)
+- `get_drive_permissions`, `share_drive_file`, `update_drive_permission`
+- `remove_drive_permission`, `transfer_drive_ownership`, `create_drive_shortcut`
+
+#### Shared Drives (3 tools)
+- `list_shared_drives`, `get_shared_drive`, `list_shared_drive_members`
+
+#### Bulk Operations (4 tools)
+- `bulk_move_files`, `bulk_trash_files`, `bulk_delete_files`, `bulk_share_files`
+
+#### Storage & Activity (2 tools)
+- `get_drive_quota`, `get_drive_activity`
+
+#### Drive Labels (6 tools)
+- `list_drive_labels`, `get_drive_label`, `get_file_labels`
+- `set_file_label`, `remove_file_label`, `search_by_label`
+
+#### Drive OCR (3 tools)
+Uses Google Drive's native OCR to extract text from images/PDFs:
+- `upload_image_with_ocr`, `ocr_existing_image`, `upload_pdf_with_ocr`
+
+---
+
+## Server 3: docs-mcp (27 tools)
+
+Local document processing. **No Google auth required.**
+
+### Dependencies
+
+```bash
+# Office documents
+pip install python-docx openpyxl python-pptx
+
+# PDF processing
+pip install pypdf pdfplumber
+
+# OCR (optional)
+pip install pytesseract pdf2image Pillow
+
+# System dependencies for OCR
+brew install tesseract poppler  # macOS
+# apt install tesseract-ocr poppler-utils  # Linux
+```
+
+### Features
+
+#### Office Reading (3 tools)
+- `read_docx_content` - Extract text, tables, structure from DOCX
+- `read_xlsx_content` - Read spreadsheet data (sheets, cells, formulas)
+- `read_pptx_content` - Extract slides, text, speaker notes
+
+#### Office Templates (6 tools)
+- `fill_docx_template`, `fill_xlsx_template`, `fill_pptx_template`
+- `create_docx_from_template`, `create_xlsx_from_template`, `create_pptx_from_template`
+
+Template syntax: `{{variable_name}}` placeholders in documents.
+
+#### Office Export (3 tools)
+- `docx_to_markdown`, `xlsx_to_csv`, `pptx_to_markdown`
+
+#### PDF Processing (7 tools)
+- `read_pdf_content` - Extract text from native PDFs
+- `get_pdf_metadata` - Get PDF properties
+- `pdf_to_markdown` - Convert to markdown
+- `extract_pdf_images` - Extract embedded images
+- `merge_pdfs` - Combine multiple PDFs
+- `split_pdf` - Split into separate pages/ranges
+- `fill_pdf_form` - Fill PDF form fields
+
+#### Local OCR (4 tools)
+Uses Tesseract for offline OCR:
+- `ocr_image_local` - OCR image files (PNG, JPG, TIFF, etc.)
+- `ocr_pdf_local` - OCR scanned PDFs
+- `ocr_file` - Auto-detect and OCR any supported file
+- `ocr_to_vault` - OCR and save to vault
+
+#### Vault Integration (4 tools)
+- `save_text_to_vault` - Save text content as markdown
+- `save_file_to_vault` - Save any file to vault
+- `batch_save_to_vault` - Save multiple files
+- `doc_to_vault` - Convert document to markdown and save
 
 ---
 
 ## Architecture
 
-The codebase is organized into modular components:
-
 ```
-gmail_mcp/
-├── main.py              # MCP server entry point
-├── types.py             # Type definitions for IDE support
-├── auth/                # OAuth and token management
-├── gmail/               # Gmail helper functions
-├── calendar/            # Calendar processing
-├── utils/
-│   ├── config.py        # Configuration management
-│   ├── logger.py        # Logging setup
-│   ├── services.py      # API service caching
-│   └── date_parser.py   # NLP date parsing (dateparser)
-└── mcp/
-    └── tools/           # Modular tool definitions
-        ├── auth.py      # Authentication tools
-        ├── email_read.py
-        ├── email_send.py     # Compose, forward, reply (+ scheduled send)
-        ├── email_manage.py
-        ├── email_settings.py # Vacation responder
-        ├── labels.py
-        ├── attachments.py
-        ├── bulk.py
-        ├── calendar.py       # Events, RSVP (+ custom reminders)
-        ├── contacts.py       # People API contact lookup
-        ├── filters.py        # Gmail filter management
-        ├── vault.py          # Obsidian vault integration
-        └── conflict.py       # Multi-calendar conflict detection (+ attendee availability)
+gmail-mcp-extended/
+├── gmail_mcp/                    # Server 1: Email + Calendar + Contacts
+│   ├── main.py                   # Entry point
+│   ├── auth/                     # OAuth management
+│   ├── gmail/                    # Gmail helpers
+│   ├── calendar/                 # Calendar processing
+│   └── mcp/tools/                # Tool definitions (93 tools)
+│       ├── email.py
+│       ├── calendar.py
+│       ├── contacts.py
+│       ├── subscriptions.py
+│       └── ...
+│
+├── drive_mcp/                    # Server 2: Google Drive
+│   ├── main.py                   # Entry point
+│   ├── drive/processor.py        # Drive API wrapper
+│   └── mcp/tools/                # Tool definitions (43 tools)
+│
+├── docs_mcp/                     # Server 3: Local Documents
+│   ├── main.py                   # Entry point
+│   ├── processors/
+│   │   ├── office.py             # DOCX/XLSX/PPTX
+│   │   ├── pdf.py                # PDF operations
+│   │   ├── ocr.py                # Tesseract OCR
+│   │   └── vault.py              # Vault export
+│   └── mcp/tools/                # Tool definitions (27 tools)
+│
+├── shared/                       # Shared utilities
+│   └── types.py                  # TypedDict definitions
+│
+├── tests/                        # Test suite (417 tests)
+│
+└── pyproject.toml                # All three entry points
 ```
-
-## Type Support
-
-The package includes:
-- `py.typed` marker for PEP 561 compliance
-- Type stubs (`.pyi` files) for key modules
-- TypedDict definitions for all API responses
-- IDE-friendly type exports in `gmail_mcp/__init__.py`
-
-## API Response Format
-
-All tools return a consistent response format:
-
-**Success responses:**
-```json
-{
-  "success": true,
-  "message": "Operation completed",
-  // ... additional data
-}
-```
-
-**Error responses:**
-```json
-{
-  "success": false,
-  "error": "Error description"
-}
-```
-
-This consistent format makes error handling predictable across all 54 tools.
 
 ---
 
-## Security Features
+## Usage Examples
 
-- **Encrypted Token Storage**: OAuth tokens are encrypted at rest using Fernet encryption with PBKDF2 key derivation
-- **CSRF Protection**: OAuth state verification prevents cross-site request forgery attacks
-- **Automatic Token Refresh**: Tokens are automatically refreshed when expired
-- **Secure Callback**: Browser-based OAuth flow with local callback server
-
-## Debugging & Logs
-
-Logs are written to:
-- **File:** `~/.gmail-mcp/gmail-mcp.log`
-- **Console:** stdout (if running interactively)
-
-To view logs in real-time:
-```bash
-tail -f ~/.gmail-mcp/gmail-mcp.log
+### gmail-mcp
+```
+"Send an email to john@example.com about the meeting"
+"What's on my calendar next week?"
+"Archive all newsletters older than 30 days"
+"Find a free hour for a meeting with Alice tomorrow"
+"Find subscription emails and show me unsubscribe options"
+"Add 30 minutes travel time before my 2pm meeting"
 ```
 
-Log level is controlled in `config.yaml`:
+### drive-mcp
+```
+"List files in my project folder"
+"Share the budget spreadsheet with the team"
+"Search Drive for files modified this week"
+"Export the proposal doc as PDF"
+"OCR this scanned receipt and extract the text"
+```
+
+### docs-mcp
+```
+"Read the contents of report.docx"
+"Fill the invoice template with this data"
+"Convert this PDF to markdown"
+"OCR this image and save to my vault"
+"Merge these three PDFs into one"
+```
+
+---
+
+## Configuration
+
+### config.yaml
+
 ```yaml
 server:
-  log_level: INFO  # or DEBUG for verbose output
+  host: localhost
+  port: 8000
+  debug: false
+  log_level: INFO
+
+calendar:
+  enabled: true
+
+contacts:
+  contacts_api_enabled: true
+
+vault:
+  inbox_folder: 0-inbox
+  attachment_folder: attachments
 ```
 
-Optionally specify a custom log file path:
-```yaml
-server:
-  log_file: ~/my-custom-path/gmail-mcp.log
-```
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GOOGLE_CLIENT_ID` | gmail/drive | OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | gmail/drive | OAuth client secret |
+| `TOKEN_ENCRYPTION_KEY` | gmail/drive | Fernet encryption key |
+| `VAULT_PATH` | Optional | Path to Obsidian vault |
+| `CONFIG_FILE_PATH` | Optional | Path to config.yaml |
+
+---
+
+## Security
+
+- **Encrypted Token Storage**: OAuth tokens encrypted at rest (Fernet + PBKDF2)
+- **CSRF Protection**: OAuth state verification
+- **Automatic Token Refresh**: Tokens refreshed on expiry
+- **Shared Auth**: drive-mcp reuses gmail-mcp tokens (no re-auth needed)
 
 ---
 
 ## Testing
 
-Run the test suite with:
 ```bash
-cd /path/to/gmail-mcp-extended
 source .venv/bin/activate
-pytest
+pytest  # 417 tests
 ```
-
-Tests cover:
-- Token management and encryption
-- OAuth flow and state verification
-- Gmail and Calendar API operations
-- Email management (compose, forward, archive, labels)
-- Bulk operations
-- Attachments
-- Filter management
-- Vault integration
-- Conflict detection
-- NLP date parsing (50+ test cases)
 
 ---
 
 ## License
 
-MIT License (same as original)
+MIT License
 
 ## Credits
 

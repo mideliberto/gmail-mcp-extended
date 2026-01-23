@@ -21,6 +21,7 @@ Tools are organized into the following modules:
 - conflict: Multi-calendar conflict detection (list_calendars, check_conflicts, find_free_time)
 - contacts: Google Contacts lookup (list_contacts, search_contacts, get_contact)
 - email_settings: Gmail settings (vacation responder)
+- subscriptions: Subscription/newsletter management (find, unsubscribe, filter)
 """
 
 from mcp.server.fastmcp import FastMCP
@@ -41,6 +42,7 @@ from gmail_mcp.mcp.tools.vault import setup_vault_tools
 from gmail_mcp.mcp.tools.conflict import setup_conflict_tools
 from gmail_mcp.mcp.tools.contacts import setup_contact_tools
 from gmail_mcp.mcp.tools.email_settings import setup_email_settings_tools
+from gmail_mcp.mcp.tools.subscriptions import setup_subscription_tools
 
 
 def setup_tools(mcp: FastMCP) -> None:
@@ -66,6 +68,7 @@ def setup_tools(mcp: FastMCP) -> None:
     setup_conflict_tools(mcp)
     setup_contact_tools(mcp)
     setup_email_settings_tools(mcp)
+    setup_subscription_tools(mcp)
 
 
 __all__ = [
@@ -86,4 +89,5 @@ __all__ = [
     "setup_conflict_tools",
     "setup_contact_tools",
     "setup_email_settings_tools",
+    "setup_subscription_tools",
 ]
