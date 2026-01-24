@@ -13,7 +13,7 @@ import logging
 import socket
 import time
 import re
-from typing import Dict, Any, Optional, Callable, Tuple, ClassVar, Type, cast, Protocol, Union, TypeVar, Generic
+from typing import Dict, Any, Optional, Callable, Tuple, ClassVar, Set, Type, cast, Protocol, Union, TypeVar, Generic
 
 from gmail_mcp.utils.logger import get_logger
 from gmail_mcp.utils.config import get_config
@@ -24,14 +24,48 @@ logger = get_logger(__name__)
 # Define a type for the callback function
 CallbackFn = Callable[[str, str], str]
 
+# Thread-safe storage for pending OAuth callbacks, keyed by state token
+_pending_callbacks: Dict[str, CallbackFn] = {}
+_pending_callbacks_lock = threading.Lock()
+_processed_states: set = set()
+
+
+def register_callback(state: str, callback_fn: CallbackFn) -> None:
+    """Register a callback function for a specific OAuth state token."""
+    with _pending_callbacks_lock:
+        _pending_callbacks[state] = callback_fn
+
+
+def get_callback(state: str) -> Optional[CallbackFn]:
+    """Get and remove the callback function for a state token (one-time use)."""
+    with _pending_callbacks_lock:
+        return _pending_callbacks.pop(state, None)
+
+
+def mark_processed(state: str) -> None:
+    """Mark a state token as processed."""
+    with _pending_callbacks_lock:
+        _processed_states.add(state)
+
+
+def is_processed(state: str) -> bool:
+    """Check if a state token has been processed."""
+    with _pending_callbacks_lock:
+        return state in _processed_states
+
+
+def clear_processed(state: str) -> None:
+    """Clear a processed state token."""
+    with _pending_callbacks_lock:
+        _processed_states.discard(state)
+
+
 class OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
     """
     HTTP request handler for OAuth callback.
     """
-    
-    # Class variable to store the callback function
-    callback_fn: ClassVar[Optional[CallbackFn]] = None
-    # Flag to indicate if the callback has been processed
+
+    # Class variable for backwards compatibility - tracks if ANY callback processed
     callback_processed: ClassVar[bool] = False
     
     def do_GET(self) -> None:
@@ -47,16 +81,25 @@ class OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
                 code = query_params.get("code", [""])[0]
                 state = query_params.get("state", [""])[0]
                 
-                # Process the authorization code if a callback function is set
-                if OAuthCallbackHandler.callback_fn is not None and code and state:
-                    # Use a safer approach to call the function
-                    fn = OAuthCallbackHandler.callback_fn
-                    result = fn(code, state)
-                    success = not result.startswith("Error")
-                    # Set the flag to indicate that the callback has been processed
-                    OAuthCallbackHandler.callback_processed = True
+                # Process the authorization code using state-keyed callback
+                if code and state:
+                    # Get callback for this specific state token (one-time use)
+                    fn = get_callback(state)
+                    # Fallback to empty-state registration for backwards compatibility
+                    if fn is None:
+                        fn = get_callback("")
+                    if fn is not None:
+                        result = fn(code, state)
+                        success = not result.startswith("Error")
+                        # Mark this state as processed
+                        mark_processed(state)
+                        OAuthCallbackHandler.callback_processed = True
+                    else:
+                        result = "Error: Invalid or expired state token"
+                        success = False
+                        logger.warning(f"Callback received with unknown state token")
                 else:
-                    result = "Error: No callback function set or missing parameters"
+                    result = "Error: Missing code or state parameters"
                     success = False
                 
                 # Send a response to the user
@@ -175,19 +218,28 @@ class OAuthCallbackServer:
         logger.warning(f"Could not find an available port after {max_attempts} attempts, using {port}")
         return port
     
-    def start(self, callback_fn: CallbackFn) -> None:
+    def start(self, callback_fn: CallbackFn, state: Optional[str] = None) -> None:
         """
         Start the OAuth callback server.
-        
+
         Args:
             callback_fn (CallbackFn): The function to call when a callback is received.
                 The function should take the authorization code and state as arguments and return a result message.
+            state (str, optional): The OAuth state token to associate with this callback.
+                If provided, the callback is registered for this specific state only.
         """
         # Reset the callback processed flag
         OAuthCallbackHandler.callback_processed = False
-        
-        # Set the callback function
-        OAuthCallbackHandler.callback_fn = callback_fn
+
+        # Register callback for specific state token if provided
+        if state:
+            register_callback(state, callback_fn)
+            self._registered_state = state
+        else:
+            # Fallback for backwards compatibility - register with empty state
+            # This is less secure but maintains API compatibility
+            register_callback("", callback_fn)
+            self._registered_state = ""
         
         try:
             # Create and start the server in a separate thread
@@ -236,10 +288,26 @@ def extract_port_from_redirect_uri(redirect_uri: str) -> int:
     return 8000
 
 
+def extract_state_from_url(auth_url: str) -> Optional[str]:
+    """
+    Extract the state parameter from an OAuth authorization URL.
+
+    Args:
+        auth_url (str): The authorization URL.
+
+    Returns:
+        Optional[str]: The state parameter, or None if not found.
+    """
+    parsed = urllib.parse.urlparse(auth_url)
+    query_params = urllib.parse.parse_qs(parsed.query)
+    state_list = query_params.get("state", [])
+    return state_list[0] if state_list else None
+
+
 def start_oauth_flow(auth_url: str, callback_fn: CallbackFn, host: str = "localhost", port: Optional[int] = None, timeout: int = 300) -> None:
     """
     Start the OAuth flow by opening the browser and starting the callback server.
-    
+
     Args:
         auth_url (str): The authorization URL to open in the browser.
         callback_fn (CallbackFn): The function to call when a callback is received.
@@ -250,7 +318,12 @@ def start_oauth_flow(auth_url: str, callback_fn: CallbackFn, host: str = "localh
     # Get the configuration
     config = get_config()
     redirect_uri = config.get("google_redirect_uri", "http://localhost:8000/auth/callback")
-    
+
+    # Extract the state from the auth URL for secure callback registration
+    state = extract_state_from_url(auth_url)
+    if not state:
+        logger.warning("No state parameter found in auth URL - callback security reduced")
+
     # Extract the port from the redirect URI if not provided
     if port is None:
         port = extract_port_from_redirect_uri(redirect_uri)
@@ -275,7 +348,7 @@ def start_oauth_flow(auth_url: str, callback_fn: CallbackFn, host: str = "localh
             print("in your Google Cloud Console project.")
             print("=" * 80 + "\n")
         
-        server.start(callback_fn)
+        server.start(callback_fn, state=state)
         
         # Open the browser
         webbrowser.open(auth_url)

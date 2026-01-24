@@ -25,8 +25,10 @@ from gmail_mcp.auth.token_manager import get_token_manager
 # Get logger
 logger = get_logger(__name__)
 
-# Get token manager singleton
-token_manager = get_token_manager()
+
+def _get_token_manager():
+    """Lazy initialization of token manager to avoid import-time errors."""
+    return get_token_manager()
 
 
 def get_scopes() -> list:
@@ -126,7 +128,7 @@ def login() -> str:
     )
 
     # Store the state for verification during callback
-    token_manager.store_state(state)
+    _get_token_manager().store_state(state)
 
     logger.info(f"Authorization URL: {auth_url}")
     return auth_url
@@ -144,7 +146,7 @@ def process_auth_code(code: str, state: str) -> str:
         str: A message indicating the result of the operation.
     """
     # Verify state parameter FIRST to prevent CSRF attacks
-    if not token_manager.verify_state(state):
+    if not _get_token_manager().verify_state(state):
         logger.error("Invalid OAuth state parameter - possible CSRF attack")
         return "Error: Invalid state parameter. Authentication rejected."
 
@@ -174,16 +176,23 @@ def process_auth_code(code: str, state: str) -> str:
     
     try:
         # Exchange the authorization code for credentials
-        # Disable scope change check by setting the environment variable
-        os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
         flow.fetch_token(code=code)
-        
+
         # Get the credentials
         credentials = flow.credentials
-        
+
+        # Validate that we got the scopes we requested
+        requested_scopes = set(get_scopes())
+        granted_scopes = set(credentials.scopes) if credentials.scopes else set()
+        missing_scopes = requested_scopes - granted_scopes
+
+        if missing_scopes:
+            # Log warning but continue - user may have declined some scopes
+            logger.warning(f"Some requested scopes were not granted: {missing_scopes}")
+
         # Save the credentials
-        token_manager.store_token(credentials)
-        
+        _get_token_manager().store_token(credentials)
+
         logger.info("Successfully processed authorization code and saved credentials")
         return "Successfully authenticated with Google. You can now close this window and return to the application."
     except Exception as e:
@@ -216,7 +225,7 @@ def start_oauth_process(timeout: int = 300) -> bool:
         start_oauth_flow(auth_url, process_auth_code, timeout=timeout)
         
         # Check if tokens exist
-        if token_manager.tokens_exist():
+        if _get_token_manager().tokens_exist():
             logger.info("Authentication completed successfully")
             return True
         else:
@@ -235,12 +244,12 @@ def get_credentials() -> Optional[Credentials]:
         Optional[Credentials]: The credentials, or None if not authenticated.
     """
     # Check if tokens exist
-    if not token_manager.tokens_exist():
+    if not _get_token_manager().tokens_exist():
         logger.warning("No tokens found")
         return None
     
     # Load the tokens
-    credentials = token_manager.get_token()
+    credentials = _get_token_manager().get_token()
     
     if not credentials:
         return None
@@ -252,7 +261,7 @@ def get_credentials() -> Optional[Credentials]:
             credentials.refresh(GoogleRequest())
             
             # Save the refreshed token
-            token_manager.store_token(credentials)
+            _get_token_manager().store_token(credentials)
             
             logger.info("Token refreshed successfully")
         except Exception as e:

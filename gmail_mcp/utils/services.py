@@ -5,6 +5,7 @@ This module provides cached instances of Gmail and Calendar services to avoid
 recreating service objects on every API call.
 """
 
+import threading
 from typing import Optional
 from googleapiclient.discovery import build, Resource
 from google.oauth2.credentials import Credentials
@@ -12,6 +13,9 @@ from google.oauth2.credentials import Credentials
 from gmail_mcp.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Thread lock for cache access
+_cache_lock = threading.Lock()
 
 # Cached service instances
 _gmail_service: Optional[Resource] = None
@@ -48,13 +52,14 @@ def get_gmail_service(credentials: Credentials) -> Resource:
     """
     global _gmail_service, _credentials_hash
 
-    cred_hash = _get_credentials_hash(credentials)
-    if _gmail_service is None or _credentials_hash != cred_hash:
-        logger.debug("Creating new Gmail service instance")
-        _gmail_service = build("gmail", "v1", credentials=credentials)
-        _credentials_hash = cred_hash
+    with _cache_lock:
+        cred_hash = _get_credentials_hash(credentials)
+        if _gmail_service is None or _credentials_hash != cred_hash:
+            logger.debug("Creating new Gmail service instance")
+            _gmail_service = build("gmail", "v1", credentials=credentials)
+            _credentials_hash = cred_hash
 
-    return _gmail_service
+        return _gmail_service
 
 
 def get_calendar_service(credentials: Credentials) -> Resource:
@@ -72,13 +77,14 @@ def get_calendar_service(credentials: Credentials) -> Resource:
     """
     global _calendar_service, _credentials_hash
 
-    cred_hash = _get_credentials_hash(credentials)
-    if _calendar_service is None or _credentials_hash != cred_hash:
-        logger.debug("Creating new Calendar service instance")
-        _calendar_service = build("calendar", "v3", credentials=credentials)
-        _credentials_hash = cred_hash
+    with _cache_lock:
+        cred_hash = _get_credentials_hash(credentials)
+        if _calendar_service is None or _credentials_hash != cred_hash:
+            logger.debug("Creating new Calendar service instance")
+            _calendar_service = build("calendar", "v3", credentials=credentials)
+            _credentials_hash = cred_hash
 
-    return _calendar_service
+        return _calendar_service
 
 
 def get_people_service(credentials: Credentials) -> Resource:
@@ -96,13 +102,14 @@ def get_people_service(credentials: Credentials) -> Resource:
     """
     global _people_service, _credentials_hash
 
-    cred_hash = _get_credentials_hash(credentials)
-    if _people_service is None or _credentials_hash != cred_hash:
-        logger.debug("Creating new People service instance")
-        _people_service = build("people", "v1", credentials=credentials)
-        _credentials_hash = cred_hash
+    with _cache_lock:
+        cred_hash = _get_credentials_hash(credentials)
+        if _people_service is None or _credentials_hash != cred_hash:
+            logger.debug("Creating new People service instance")
+            _people_service = build("people", "v1", credentials=credentials)
+            _credentials_hash = cred_hash
 
-    return _people_service
+        return _people_service
 
 
 def clear_service_cache() -> None:
@@ -112,8 +119,10 @@ def clear_service_cache() -> None:
     This should be called when logging out or when credentials are invalidated.
     """
     global _gmail_service, _calendar_service, _people_service, _credentials_hash
-    _gmail_service = None
-    _calendar_service = None
-    _people_service = None
-    _credentials_hash = None
-    logger.debug("Cleared service cache")
+
+    with _cache_lock:
+        _gmail_service = None
+        _calendar_service = None
+        _people_service = None
+        _credentials_hash = None
+        logger.debug("Cleared service cache")

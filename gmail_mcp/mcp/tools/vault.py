@@ -155,8 +155,17 @@ def setup_vault_tools(mcp: FastMCP) -> None:
             else:
                 filename = f"{date_str} Email from {clean_sender} - {clean_subject}"
 
-            # Ensure inbox folder exists
-            inbox_path = Path(vault_path) / inbox_folder
+            # Sanitize and validate inbox folder path
+            safe_inbox_folder = _sanitize_folder_path(inbox_folder)
+            inbox_path = Path(vault_path) / safe_inbox_folder
+
+            # Validate path is within vault (prevent path traversal)
+            if not _validate_path_within_vault(Path(vault_path), inbox_path):
+                return {
+                    "success": False,
+                    "error": f"Invalid inbox folder path: {inbox_folder}"
+                }
+
             inbox_path.mkdir(parents=True, exist_ok=True)
 
             # Handle attachments
@@ -164,7 +173,17 @@ def setup_vault_tools(mcp: FastMCP) -> None:
             if include_attachments:
                 attachments = _get_attachments(msg)
                 if attachments:
-                    attachment_dir = inbox_path / attachment_folder
+                    # Sanitize and validate attachment folder path
+                    safe_attachment_folder = _sanitize_folder_path(attachment_folder)
+                    attachment_dir = inbox_path / safe_attachment_folder
+
+                    # Validate attachment path is within vault
+                    if not _validate_path_within_vault(Path(vault_path), attachment_dir):
+                        return {
+                            "success": False,
+                            "error": f"Invalid attachment folder path: {attachment_folder}"
+                        }
+
                     attachment_dir.mkdir(parents=True, exist_ok=True)
 
                     for att in attachments:
@@ -183,7 +202,7 @@ def setup_vault_tools(mcp: FastMCP) -> None:
                                 f.write(data)
 
                             # Relative path for linking in markdown
-                            rel_path = f"{attachment_folder}/{att_filename}"
+                            rel_path = f"{safe_attachment_folder}/{att_filename}"
                             attachment_paths.append({
                                 "filename": att["filename"],
                                 "path": rel_path,
@@ -460,7 +479,17 @@ def _save_single_email(
 
         filename = f"{date_str} Email from {clean_sender} - {clean_subject}"
 
-        inbox_path = Path(vault_path) / inbox_folder
+        # Sanitize and validate inbox folder path
+        safe_inbox_folder = _sanitize_folder_path(inbox_folder)
+        inbox_path = Path(vault_path) / safe_inbox_folder
+
+        # Validate path is within vault
+        if not _validate_path_within_vault(Path(vault_path), inbox_path):
+            return {
+                "success": False,
+                "error": f"Invalid inbox folder path: {inbox_folder}"
+            }
+
         inbox_path.mkdir(parents=True, exist_ok=True)
 
         # Handle attachments
@@ -469,6 +498,14 @@ def _save_single_email(
             attachments = _get_attachments(msg)
             if attachments:
                 attachment_dir = inbox_path / "attachments"
+
+                # Validate attachment path is within vault
+                if not _validate_path_within_vault(Path(vault_path), attachment_dir):
+                    return {
+                        "success": False,
+                        "error": "Invalid attachment folder path"
+                    }
+
                 attachment_dir.mkdir(parents=True, exist_ok=True)
 
                 for att in attachments:
@@ -555,6 +592,54 @@ def _sanitize_filename(name: str) -> str:
     name = re.sub(r'[<>:"/\\|?*]', '', name)
     name = re.sub(r'\s+', ' ', name).strip()
     return name
+
+
+def _validate_path_within_vault(vault_path: Path, target_path: Path) -> bool:
+    """
+    Validate that a target path is within the vault directory.
+
+    Prevents path traversal attacks where user input like "../../../etc/passwd"
+    could escape the vault directory.
+
+    Args:
+        vault_path: The resolved vault root path
+        target_path: The path to validate
+
+    Returns:
+        bool: True if target_path is within vault_path, False otherwise
+    """
+    try:
+        # Resolve both paths to absolute, normalized form
+        vault_resolved = vault_path.resolve()
+        target_resolved = target_path.resolve()
+
+        # Check if target is under vault
+        # Using is_relative_to (Python 3.9+) or string prefix check
+        try:
+            target_resolved.relative_to(vault_resolved)
+            return True
+        except ValueError:
+            return False
+    except Exception:
+        return False
+
+
+def _sanitize_folder_path(folder: str) -> str:
+    """
+    Sanitize a folder path to prevent path traversal.
+
+    Args:
+        folder: User-provided folder path
+
+    Returns:
+        str: Sanitized folder path with traversal sequences removed
+    """
+    # Remove path traversal sequences
+    # Replace backslashes with forward slashes for consistency
+    folder = folder.replace("\\", "/")
+    # Remove .. components
+    parts = [p for p in folder.split("/") if p and p != ".." and p != "."]
+    return "/".join(parts)
 
 
 def _get_attachments(msg: dict) -> list:

@@ -13,8 +13,14 @@ from datetime import datetime, timedelta
 class TestSingletonPattern:
     """Tests for TokenManager singleton pattern."""
 
-    def test_get_token_manager_returns_same_instance(self):
+    @patch("gmail_mcp.auth.token_manager.get_config")
+    def test_get_token_manager_returns_same_instance(self, mock_get_config, tmp_path):
         """Test that get_token_manager returns the same instance."""
+        mock_get_config.return_value = {
+            "token_storage_path": str(tmp_path / "tokens.json"),
+            "token_encryption_key": "test_key_for_singleton",
+        }
+
         from gmail_mcp.auth.token_manager import get_token_manager, _instance
 
         # Reset singleton for clean test
@@ -26,8 +32,14 @@ class TestSingletonPattern:
 
         assert tm1 is tm2
 
-    def test_singleton_persists_state(self):
+    @patch("gmail_mcp.auth.token_manager.get_config")
+    def test_singleton_persists_state(self, mock_get_config, tmp_path):
         """Test that singleton maintains state across calls."""
+        mock_get_config.return_value = {
+            "token_storage_path": str(tmp_path / "tokens.json"),
+            "token_encryption_key": "test_key_for_singleton",
+        }
+
         from gmail_mcp.auth.token_manager import get_token_manager
 
         import gmail_mcp.auth.token_manager as tm_module
@@ -63,19 +75,19 @@ class TestPBKDF2KeyDerivation:
         assert tm.fernet is not None
 
     @patch("gmail_mcp.auth.token_manager.get_config")
-    def test_no_encryption_without_key(self, mock_get_config):
-        """Test that encryption is disabled without key."""
+    def test_no_encryption_without_key_raises_error(self, mock_get_config):
+        """Test that missing encryption key raises ValueError."""
         from gmail_mcp.auth.token_manager import TokenManager
 
         mock_get_config.return_value = {
             "token_storage_path": "/tmp/test_tokens.json",
-            "token_encryption_key": "",
+            "token_encryption_key": "",  # Empty key should raise error
         }
 
-        tm = TokenManager()
+        with pytest.raises(ValueError) as exc_info:
+            TokenManager()
 
-        assert tm.encryption_key is None
-        assert tm.fernet is None
+        assert "TOKEN_ENCRYPTION_KEY" in str(exc_info.value)
 
     @patch("gmail_mcp.auth.token_manager.get_config")
     def test_same_key_produces_same_derived_key(self, mock_get_config):
@@ -116,39 +128,21 @@ class TestTokenStorage:
     """Tests for token storage and retrieval."""
 
     @patch("gmail_mcp.auth.token_manager.get_config")
-    def test_store_and_retrieve_token_unencrypted(self, mock_get_config, tmp_path):
-        """Test storing and retrieving token without encryption."""
+    def test_encryption_always_required(self, mock_get_config, tmp_path):
+        """Test that encryption is always required (no unencrypted storage)."""
         from gmail_mcp.auth.token_manager import TokenManager
 
         token_file = tmp_path / "tokens.json"
         mock_get_config.return_value = {
             "token_storage_path": str(token_file),
-            "token_encryption_key": "",
+            "token_encryption_key": "",  # Empty key should raise error
         }
 
-        tm = TokenManager()
+        # Should raise ValueError when no encryption key provided
+        with pytest.raises(ValueError) as exc_info:
+            TokenManager()
 
-        # Create mock credentials
-        mock_creds = Mock()
-        mock_creds.token = "access_token_123"
-        mock_creds.refresh_token = "refresh_token_456"
-        mock_creds.token_uri = "https://oauth2.googleapis.com/token"
-        mock_creds.client_id = "client_id"
-        mock_creds.client_secret = "client_secret"
-        mock_creds.scopes = ["scope1", "scope2"]
-        mock_creds.expiry = datetime.now() + timedelta(hours=1)
-
-        # Store token
-        tm.store_token(mock_creds)
-
-        # Verify file exists
-        assert token_file.exists()
-
-        # Verify content is valid JSON (unencrypted)
-        with open(token_file) as f:
-            data = json.load(f)
-        assert data["token"] == "access_token_123"
-        assert data["refresh_token"] == "refresh_token_456"
+        assert "TOKEN_ENCRYPTION_KEY" in str(exc_info.value)
 
     @patch("gmail_mcp.auth.token_manager.get_config")
     def test_store_and_retrieve_token_encrypted(self, mock_get_config, tmp_path):
@@ -199,7 +193,7 @@ class TestTokenStorage:
         token_file = tmp_path / "nonexistent.json"
         mock_get_config.return_value = {
             "token_storage_path": str(token_file),
-            "token_encryption_key": "",
+            "token_encryption_key": "test_encryption_key",
         }
 
         tm = TokenManager()
@@ -217,7 +211,7 @@ class TestTokenStorage:
 
         mock_get_config.return_value = {
             "token_storage_path": str(token_file),
-            "token_encryption_key": "",
+            "token_encryption_key": "test_encryption_key",
         }
 
         tm = TokenManager()
@@ -234,7 +228,7 @@ class TestTokenStorage:
         token_file = tmp_path / "tokens.json"
         mock_get_config.return_value = {
             "token_storage_path": str(token_file),
-            "token_encryption_key": "",
+            "token_encryption_key": "test_encryption_key",
         }
 
         tm = TokenManager()
@@ -254,7 +248,7 @@ class TestOAuthStateVerification:
 
         mock_get_config.return_value = {
             "token_storage_path": str(tmp_path / "tokens.json"),
-            "token_encryption_key": "",
+            "token_encryption_key": "test_encryption_key",
         }
 
         tm = TokenManager()
@@ -272,7 +266,7 @@ class TestOAuthStateVerification:
 
         mock_get_config.return_value = {
             "token_storage_path": str(tmp_path / "tokens.json"),
-            "token_encryption_key": "",
+            "token_encryption_key": "test_encryption_key",
         }
 
         tm = TokenManager()
@@ -287,7 +281,7 @@ class TestOAuthStateVerification:
 
         mock_get_config.return_value = {
             "token_storage_path": str(tmp_path / "tokens.json"),
-            "token_encryption_key": "",
+            "token_encryption_key": "test_encryption_key",
         }
 
         tm = TokenManager()
@@ -301,7 +295,7 @@ class TestOAuthStateVerification:
 
         mock_get_config.return_value = {
             "token_storage_path": str(tmp_path / "tokens.json"),
-            "token_encryption_key": "",
+            "token_encryption_key": "test_encryption_key",
         }
 
         tm = TokenManager()
@@ -320,7 +314,7 @@ class TestOAuthStateVerification:
 
         mock_get_config.return_value = {
             "token_storage_path": str(tmp_path / "tokens.json"),
-            "token_encryption_key": "",
+            "token_encryption_key": "test_encryption_key",
         }
 
         tm = TokenManager()
@@ -340,7 +334,7 @@ class TestTokenPath:
 
         mock_get_config.return_value = {
             "token_storage_path": "",
-            "token_encryption_key": "",
+            "token_encryption_key": "test_encryption_key",
         }
 
         tm = TokenManager()
@@ -349,18 +343,19 @@ class TestTokenPath:
         assert tm.token_path == expected
 
     @patch("gmail_mcp.auth.token_manager.get_config")
-    def test_custom_token_path(self, mock_get_config):
+    def test_custom_token_path(self, mock_get_config, tmp_path):
         """Test custom token path is respected."""
         from gmail_mcp.auth.token_manager import TokenManager
 
+        custom_path = tmp_path / "custom" / "path" / "tokens.json"
         mock_get_config.return_value = {
-            "token_storage_path": "/custom/path/tokens.json",
-            "token_encryption_key": "",
+            "token_storage_path": str(custom_path),
+            "token_encryption_key": "test_encryption_key",
         }
 
         tm = TokenManager()
 
-        assert tm.token_path == Path("/custom/path/tokens.json")
+        assert tm.token_path == custom_path
 
     @patch("gmail_mcp.auth.token_manager.get_config")
     def test_tilde_expansion(self, mock_get_config):
@@ -369,7 +364,7 @@ class TestTokenPath:
 
         mock_get_config.return_value = {
             "token_storage_path": "~/my_tokens/tokens.json",
-            "token_encryption_key": "",
+            "token_encryption_key": "test_encryption_key",
         }
 
         tm = TokenManager()

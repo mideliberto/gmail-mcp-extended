@@ -46,8 +46,29 @@ level, so patch the import location:
         @patch("gmail_mcp.mcp.tools.conflict.get_calendar_service")
 """
 
+import os
 import pytest
 from unittest.mock import Mock, MagicMock, patch
+
+
+@pytest.fixture(autouse=True)
+def set_test_encryption_key(tmp_path, monkeypatch):
+    """
+    Set TOKEN_ENCRYPTION_KEY for all tests and reset token manager singleton.
+
+    This ensures tests don't fail due to missing encryption key.
+    """
+    # Set encryption key in environment
+    monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "test_encryption_key_for_pytest")
+
+    # Reset the token manager singleton before each test
+    import gmail_mcp.auth.token_manager as tm_module
+    tm_module._instance = None
+
+    yield
+
+    # Reset singleton after test
+    tm_module._instance = None
 
 
 # Common mock creators
