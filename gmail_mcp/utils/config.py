@@ -60,6 +60,8 @@ def get_config() -> Dict[str, Any]:
     google_config = yaml_config.get("google", {})
     gmail_config = yaml_config.get("gmail", {})
     calendar_config = yaml_config.get("calendar", {})
+    contacts_config = yaml_config.get("contacts", {})
+    drive_config = yaml_config.get("drive", {})
     tokens_config = yaml_config.get("tokens", {})
     vault_config = yaml_config.get("vault", {})
     claude_review_config = yaml_config.get("claude_review", {})
@@ -102,7 +104,16 @@ def get_config() -> Dict[str, Any]:
         "calendar_api_enabled": calendar_config.get("enabled", False),
         "calendar_api_scopes": safe_split(calendar_config.get("scopes", "https://www.googleapis.com/auth/calendar.readonly,"
                                                 "https://www.googleapis.com/auth/calendar.events")),
-        
+
+        # Contacts API configuration (from YAML)
+        "contacts_api_enabled": contacts_config.get("enabled", False),
+
+        # Drive API configuration (from YAML)
+        "drive_api_enabled": drive_config.get("enabled", False),
+        "drive_api_scopes": safe_split(drive_config.get("scopes", "https://www.googleapis.com/auth/drive,"
+                                                "https://www.googleapis.com/auth/drive.labels,"
+                                                "https://www.googleapis.com/auth/drive.activity.readonly")),
+
         # Token storage configuration (path from YAML, encryption key from env vars)
         "token_storage_path": tokens_config.get("storage_path", "./tokens.json"),
         "token_encryption_key": os.getenv("TOKEN_ENCRYPTION_KEY", ""),

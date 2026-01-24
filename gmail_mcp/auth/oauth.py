@@ -63,6 +63,17 @@ def get_scopes() -> list:
         if contacts_scope not in scopes:
             scopes.append(contacts_scope)
 
+    # Add Drive API scopes if enabled
+    if config.get("drive_api_enabled", False):
+        drive_scopes = config.get("drive_api_scopes", [
+            "https://www.googleapis.com/auth/drive",
+            "https://www.googleapis.com/auth/drive.labels",
+            "https://www.googleapis.com/auth/drive.activity.readonly",
+        ])
+        for scope in drive_scopes:
+            if scope not in scopes:
+                scopes.append(scope)
+
     # Always include user info scopes
     user_info_scopes = [
         "https://www.googleapis.com/auth/userinfo.email",
