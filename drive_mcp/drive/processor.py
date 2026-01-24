@@ -1704,6 +1704,377 @@ class DriveProcessor:
             "file": result,
         }
 
+    # =========================================================================
+    # Star/Unstar Operations
+    # =========================================================================
+
+    def star_file(self, file_id: str) -> Dict[str, Any]:
+        """
+        Star a file for quick access.
+
+        Args:
+            file_id: The ID of the file to star.
+
+        Returns:
+            Dict containing success status and file info.
+        """
+        service = self._get_service()
+
+        result = (
+            service.files()
+            .update(fileId=file_id, body={"starred": True}, fields="id, name, starred")
+            .execute()
+        )
+
+        return {
+            "success": True,
+            "message": f"File '{result.get('name')}' starred",
+            "file": result,
+        }
+
+    def unstar_file(self, file_id: str) -> Dict[str, Any]:
+        """
+        Remove star from a file.
+
+        Args:
+            file_id: The ID of the file to unstar.
+
+        Returns:
+            Dict containing success status and file info.
+        """
+        service = self._get_service()
+
+        result = (
+            service.files()
+            .update(fileId=file_id, body={"starred": False}, fields="id, name, starred")
+            .execute()
+        )
+
+        return {
+            "success": True,
+            "message": f"Star removed from '{result.get('name')}'",
+            "file": result,
+        }
+
+    # =========================================================================
+    # Comments Operations
+    # =========================================================================
+
+    def list_comments(
+        self,
+        file_id: str,
+        page_size: int = 20,
+        page_token: Optional[str] = None,
+        include_deleted: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        List comments on a file.
+
+        Args:
+            file_id: The ID of the file.
+            page_size: Maximum number of comments to return.
+            page_token: Token for pagination.
+            include_deleted: Whether to include deleted comments.
+
+        Returns:
+            Dict containing comments list and pagination token.
+        """
+        service = self._get_service()
+
+        result = (
+            service.comments()
+            .list(
+                fileId=file_id,
+                pageSize=page_size,
+                pageToken=page_token,
+                includeDeleted=include_deleted,
+                fields="comments(id, content, author, createdTime, modifiedTime, resolved, replies), nextPageToken",
+            )
+            .execute()
+        )
+
+        return {
+            "success": True,
+            "file_id": file_id,
+            "comments": result.get("comments", []),
+            "next_page_token": result.get("nextPageToken"),
+        }
+
+    def add_comment(
+        self,
+        file_id: str,
+        content: str,
+        anchor: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Add a comment to a file.
+
+        Args:
+            file_id: The ID of the file.
+            content: The text content of the comment.
+            anchor: Optional anchor for the comment (for specific location).
+
+        Returns:
+            Dict containing the created comment.
+        """
+        service = self._get_service()
+
+        body: Dict[str, Any] = {"content": content}
+        if anchor:
+            body["anchor"] = anchor
+
+        result = (
+            service.comments()
+            .create(
+                fileId=file_id,
+                body=body,
+                fields="id, content, author, createdTime",
+            )
+            .execute()
+        )
+
+        return {
+            "success": True,
+            "message": "Comment added",
+            "comment": result,
+        }
+
+    def delete_comment(self, file_id: str, comment_id: str) -> Dict[str, Any]:
+        """
+        Delete a comment from a file.
+
+        Args:
+            file_id: The ID of the file.
+            comment_id: The ID of the comment to delete.
+
+        Returns:
+            Dict containing success status.
+        """
+        service = self._get_service()
+
+        service.comments().delete(fileId=file_id, commentId=comment_id).execute()
+
+        return {
+            "success": True,
+            "message": f"Comment {comment_id} deleted",
+        }
+
+    # =========================================================================
+    # Revisions Operations
+    # =========================================================================
+
+    def list_revisions(
+        self,
+        file_id: str,
+        page_size: int = 10,
+        page_token: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        List revisions (version history) of a file.
+
+        Args:
+            file_id: The ID of the file.
+            page_size: Maximum number of revisions to return.
+            page_token: Token for pagination.
+
+        Returns:
+            Dict containing revisions list and pagination token.
+        """
+        service = self._get_service()
+
+        result = (
+            service.revisions()
+            .list(
+                fileId=file_id,
+                pageSize=page_size,
+                pageToken=page_token,
+                fields="revisions(id, modifiedTime, lastModifyingUser, size, keepForever, publishAuto, published), nextPageToken",
+            )
+            .execute()
+        )
+
+        return {
+            "success": True,
+            "file_id": file_id,
+            "revisions": result.get("revisions", []),
+            "next_page_token": result.get("nextPageToken"),
+        }
+
+    def get_revision(self, file_id: str, revision_id: str) -> Dict[str, Any]:
+        """
+        Get metadata for a specific revision.
+
+        Args:
+            file_id: The ID of the file.
+            revision_id: The ID of the revision.
+
+        Returns:
+            Dict containing revision metadata.
+        """
+        service = self._get_service()
+
+        result = (
+            service.revisions()
+            .get(
+                fileId=file_id,
+                revisionId=revision_id,
+                fields="id, modifiedTime, lastModifyingUser, size, keepForever, mimeType, originalFilename",
+            )
+            .execute()
+        )
+
+        return {
+            "success": True,
+            "revision": result,
+        }
+
+    def download_revision(
+        self,
+        file_id: str,
+        revision_id: str,
+        output_path: str,
+    ) -> Dict[str, Any]:
+        """
+        Download a specific revision of a file.
+
+        Args:
+            file_id: The ID of the file.
+            revision_id: The ID of the revision.
+            output_path: Path to save the downloaded file.
+
+        Returns:
+            Dict containing success status and output path.
+        """
+        service = self._get_service()
+
+        request = service.revisions().get_media(fileId=file_id, revisionId=revision_id)
+
+        with io.FileIO(output_path, "wb") as fh:
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+
+        return {
+            "success": True,
+            "message": f"Revision downloaded to {output_path}",
+            "output_path": output_path,
+        }
+
+    # =========================================================================
+    # Shared Drive Admin Operations (Workspace only)
+    # =========================================================================
+
+    def create_shared_drive(self, name: str, request_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Create a new shared drive.
+
+        Note: Requires Google Workspace admin permissions.
+
+        Args:
+            name: Name for the shared drive.
+            request_id: Unique request ID for idempotency.
+
+        Returns:
+            Dict containing the created shared drive info.
+        """
+        import uuid
+        service = self._get_service()
+
+        if not request_id:
+            request_id = str(uuid.uuid4())
+
+        result = (
+            service.drives()
+            .create(
+                requestId=request_id,
+                body={"name": name},
+                fields="id, name, createdTime",
+            )
+            .execute()
+        )
+
+        return {
+            "success": True,
+            "message": f"Shared drive '{name}' created",
+            "drive": result,
+        }
+
+    def delete_shared_drive(self, drive_id: str) -> Dict[str, Any]:
+        """
+        Delete a shared drive.
+
+        Note: Requires Google Workspace admin permissions.
+        The drive must be empty.
+
+        Args:
+            drive_id: The ID of the shared drive to delete.
+
+        Returns:
+            Dict containing success status.
+        """
+        service = self._get_service()
+
+        service.drives().delete(driveId=drive_id).execute()
+
+        return {
+            "success": True,
+            "message": f"Shared drive {drive_id} deleted",
+        }
+
+    def update_shared_drive(
+        self,
+        drive_id: str,
+        name: Optional[str] = None,
+        restrictions: Optional[Dict[str, bool]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Update a shared drive's settings.
+
+        Note: Requires Google Workspace admin permissions.
+
+        Args:
+            drive_id: The ID of the shared drive.
+            name: New name for the drive (optional).
+            restrictions: Dict of restriction settings (optional).
+                - adminManagedRestrictions: bool
+                - copyRequiresWriterPermission: bool
+                - domainUsersOnly: bool
+                - driveMembersOnly: bool
+
+        Returns:
+            Dict containing the updated shared drive info.
+        """
+        service = self._get_service()
+
+        body: Dict[str, Any] = {}
+        if name:
+            body["name"] = name
+        if restrictions:
+            body["restrictions"] = restrictions
+
+        if not body:
+            return {
+                "success": False,
+                "error": "No updates specified",
+            }
+
+        result = (
+            service.drives()
+            .update(
+                driveId=drive_id,
+                body=body,
+                fields="id, name, restrictions",
+            )
+            .execute()
+        )
+
+        return {
+            "success": True,
+            "message": "Shared drive updated",
+            "drive": result,
+        }
+
 
 # Singleton instance
 _processor: Optional[DriveProcessor] = None

@@ -1,6 +1,6 @@
 # drive-mcp Tool Reference
 
-Google Drive file management server with 43 tools.
+Google Drive file management server with 54 tools.
 
 ## Prerequisites
 
@@ -10,7 +10,7 @@ Google Drive file management server with 43 tools.
 
 ---
 
-## File Operations (12 tools)
+## File Operations (14 tools)
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
@@ -26,6 +26,8 @@ Google Drive file management server with 43 tools.
 | `trash_drive_file` | Move to trash | `file_id` |
 | `restore_drive_file` | Restore from trash | `file_id` |
 | `delete_drive_file` | Permanently delete | `file_id` |
+| `star_drive_file` | Star file for quick access | `file_id` |
+| `unstar_drive_file` | Remove star from file | `file_id` |
 
 ### Search Query Examples
 
@@ -112,13 +114,18 @@ search_drive_files(query="name contains 'report' and mimeType='application/pdf'"
 
 ---
 
-## Shared Drives (3 tools)
+## Shared Drives (6 tools)
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
 | `list_shared_drives` | List accessible shared drives | `max_results` |
 | `get_shared_drive` | Get shared drive details | `drive_id` |
 | `list_shared_drive_members` | List drive members | `drive_id` |
+| `create_shared_drive` | Create new shared drive | `name`, `request_id` |
+| `delete_shared_drive` | Delete shared drive | `drive_id` |
+| `update_shared_drive` | Update drive name/settings | `drive_id`, `name` |
+
+*Note: Create/delete/update require Google Workspace admin permissions.*
 
 ---
 
@@ -147,6 +154,26 @@ search_drive_files(query="name contains 'report' and mimeType='application/pdf'"
 - Permissions changed
 - File shared
 - File trashed/restored
+
+---
+
+## Comments (3 tools)
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `list_drive_comments` | List comments on file | `file_id`, `page_size`, `page_token`, `include_deleted` |
+| `add_drive_comment` | Add comment to file | `file_id`, `content` |
+| `delete_drive_comment` | Delete a comment | `file_id`, `comment_id` |
+
+---
+
+## Revisions (3 tools)
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `list_drive_revisions` | List file version history | `file_id`, `page_size`, `page_token` |
+| `get_drive_revision` | Get revision metadata | `file_id`, `revision_id` |
+| `download_drive_revision` | Download previous version | `file_id`, `revision_id`, `output_path` |
 
 ---
 

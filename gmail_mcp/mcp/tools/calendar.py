@@ -1214,3 +1214,198 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
         except Exception as e:
             logger.error(f"Failed to add travel buffer: {e}")
             return {"success": False, "error": f"Failed to add travel buffer: {e}"}
+
+    @mcp.tool()
+    def get_calendar_event(
+        event_id: str,
+        calendar_id: str = "primary"
+    ) -> Dict[str, Any]:
+        """
+        Get a specific calendar event by ID.
+
+        Args:
+            event_id: The ID of the event to retrieve.
+            calendar_id: The calendar ID (default: "primary").
+
+        Returns:
+            Dict containing event details including:
+                - id: Event ID
+                - summary: Event title
+                - start: Start time
+                - end: End time
+                - location: Event location
+                - description: Event description
+                - attendees: List of attendees
+                - event_link: Direct link to the event
+
+        Example usage:
+            get_calendar_event(event_id="abc123xyz")
+        """
+        credentials = get_credentials()
+        if not credentials:
+            return {"success": False, "error": "Not authenticated. Please authenticate first."}
+
+        try:
+            service = get_calendar_service(credentials)
+
+            event = service.events().get(
+                calendarId=calendar_id,
+                eventId=event_id
+            ).execute()
+
+            return {
+                "success": True,
+                "event": {
+                    "id": event.get("id"),
+                    "summary": event.get("summary", ""),
+                    "description": event.get("description", ""),
+                    "location": event.get("location", ""),
+                    "start": event.get("start", {}),
+                    "end": event.get("end", {}),
+                    "attendees": event.get("attendees", []),
+                    "organizer": event.get("organizer", {}),
+                    "status": event.get("status"),
+                    "recurrence": event.get("recurrence"),
+                    "reminders": event.get("reminders", {}),
+                    "colorId": event.get("colorId"),
+                    "event_link": event.get("htmlLink", ""),
+                    "created": event.get("created"),
+                    "updated": event.get("updated"),
+                }
+            }
+
+        except HttpError as e:
+            if e.resp.status == 404:
+                return {"success": False, "error": f"Event not found: {event_id}"}
+            logger.error(f"Google Calendar API error: {e}")
+            return {"success": False, "error": f"Calendar API error: {e.reason if hasattr(e, 'reason') else str(e)}"}
+        except Exception as e:
+            logger.error(f"Failed to get calendar event: {e}")
+            return {"success": False, "error": f"Failed to get event: {e}"}
+
+    @mcp.tool()
+    def duplicate_calendar_event(
+        event_id: str,
+        new_start_time: Optional[str] = None,
+        new_summary: Optional[str] = None,
+        calendar_id: str = "primary"
+    ) -> Dict[str, Any]:
+        """
+        Duplicate an existing calendar event.
+
+        Creates a copy of the event with optional new start time and title.
+        Duration is preserved from the original event.
+
+        Args:
+            event_id: The ID of the event to duplicate.
+            new_start_time: New start time for the duplicate (supports NLP like "tomorrow at 2pm").
+                           If not provided, creates the duplicate at the same time.
+            new_summary: New title for the duplicate. If not provided, uses original title.
+            calendar_id: The calendar ID (default: "primary").
+
+        Returns:
+            Dict containing the created event details.
+
+        Example usage:
+            duplicate_calendar_event(event_id="abc123", new_start_time="next monday at 10am")
+            duplicate_calendar_event(event_id="abc123", new_summary="Follow-up Meeting")
+        """
+        credentials = get_credentials()
+        if not credentials:
+            return {"success": False, "error": "Not authenticated. Please authenticate first."}
+
+        try:
+            service = get_calendar_service(credentials)
+
+            # Get the original event
+            original = service.events().get(
+                calendarId=calendar_id,
+                eventId=event_id
+            ).execute()
+
+            # Calculate duration from original
+            original_start = original.get("start", {})
+            original_end = original.get("end", {})
+
+            # Handle all-day vs timed events
+            is_all_day = "date" in original_start
+
+            if is_all_day:
+                start_date = datetime.strptime(original_start["date"], "%Y-%m-%d")
+                end_date = datetime.strptime(original_end["date"], "%Y-%m-%d")
+                duration = end_date - start_date
+            else:
+                start_dt = parser.isoparse(original_start.get("dateTime"))
+                end_dt = parser.isoparse(original_end.get("dateTime"))
+                duration = end_dt - start_dt
+
+            # Determine new start time
+            if new_start_time:
+                user_tz = get_user_timezone(service)
+                parsed_start = parse_natural_date(new_start_time, user_tz)
+                if not parsed_start:
+                    return {"success": False, "error": f"Could not parse start time: {new_start_time}"}
+                new_start_dt = parsed_start
+            else:
+                if is_all_day:
+                    new_start_dt = start_date
+                else:
+                    new_start_dt = parser.isoparse(original_start.get("dateTime"))
+
+            # Calculate new end time
+            new_end_dt = new_start_dt + duration
+
+            # Build new event body
+            new_event = {
+                "summary": new_summary or original.get("summary", ""),
+                "description": original.get("description", ""),
+                "location": original.get("location", ""),
+            }
+
+            if is_all_day:
+                new_event["start"] = {"date": new_start_dt.strftime("%Y-%m-%d")}
+                new_event["end"] = {"date": new_end_dt.strftime("%Y-%m-%d")}
+            else:
+                tz = original_start.get("timeZone", "UTC")
+                new_event["start"] = {
+                    "dateTime": new_start_dt.isoformat(),
+                    "timeZone": tz
+                }
+                new_event["end"] = {
+                    "dateTime": new_end_dt.isoformat(),
+                    "timeZone": tz
+                }
+
+            # Copy optional fields
+            if original.get("colorId"):
+                new_event["colorId"] = original["colorId"]
+            if original.get("reminders"):
+                new_event["reminders"] = original["reminders"]
+
+            # Create the duplicate
+            created = service.events().insert(
+                calendarId=calendar_id,
+                body=new_event
+            ).execute()
+
+            return {
+                "success": True,
+                "message": f"Event duplicated: '{new_event['summary']}'",
+                "event": {
+                    "id": created.get("id"),
+                    "summary": created.get("summary"),
+                    "start": created.get("start"),
+                    "end": created.get("end"),
+                    "event_link": created.get("htmlLink", ""),
+                },
+                "original_event_id": event_id
+            }
+
+        except HttpError as e:
+            if e.resp.status == 404:
+                return {"success": False, "error": f"Original event not found: {event_id}"}
+            logger.error(f"Google Calendar API error: {e}")
+            return {"success": False, "error": f"Calendar API error: {e.reason if hasattr(e, 'reason') else str(e)}"}
+        except Exception as e:
+            logger.error(f"Failed to duplicate calendar event: {e}")
+            return {"success": False, "error": f"Failed to duplicate event: {e}"}

@@ -1,6 +1,6 @@
 # docs-mcp Tool Reference
 
-Local document processing server with 27 tools. **No Google authentication required.**
+Local document processing server with 32 tools. **No Google authentication required.**
 
 ## Prerequisites
 
@@ -183,7 +183,7 @@ Paragraph text here.
 
 ---
 
-## PDF Processing (7 tools)
+## PDF Processing (12 tools)
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
@@ -194,6 +194,11 @@ Paragraph text here.
 | `merge_pdfs` | Combine multiple PDFs | `input_paths`, `output_path` |
 | `split_pdf` | Split into pages/ranges | `file_path`, `output_folder`, `pages` |
 | `fill_pdf_form` | Fill PDF form fields | `file_path`, `output_path`, `field_data` |
+| `rotate_pdf` | Rotate pages | `file_path`, `output_path`, `rotation`, `pages` |
+| `compress_pdf` | Reduce file size | `file_path`, `output_path`, `remove_duplication`, `remove_images` |
+| `add_watermark` | Add watermark text | `file_path`, `output_path`, `watermark_text`, `position`, `opacity` |
+| `encrypt_pdf` | Password-protect PDF | `file_path`, `output_path`, `user_password`, `owner_password`, `allow_printing`, `allow_copying` |
+| `decrypt_pdf` | Remove password | `file_path`, `output_path`, `password` |
 
 ### Page Selection
 
@@ -247,6 +252,85 @@ fill_pdf_form(
         "date": "2026-01-22",
         "signature": "John Doe"
     }
+)
+```
+
+### Rotate PDF
+
+```python
+# Rotate all pages 90 degrees clockwise
+rotate_pdf(
+    file_path="/path/to/document.pdf",
+    output_path="/path/to/rotated.pdf",
+    rotation=90
+)
+
+# Rotate specific pages 180 degrees
+rotate_pdf(
+    file_path="/path/to/document.pdf",
+    output_path="/path/to/rotated.pdf",
+    rotation=180,
+    pages="1-3,5"
+)
+```
+
+### Compress PDF
+
+```python
+# Basic compression
+compress_pdf(
+    file_path="/path/to/large.pdf",
+    output_path="/path/to/compressed.pdf"
+)
+
+# Aggressive compression (remove images)
+compress_pdf(
+    file_path="/path/to/large.pdf",
+    output_path="/path/to/small.pdf",
+    remove_images=True
+)
+```
+
+### Add Watermark
+
+```python
+# Center watermark
+add_watermark(
+    file_path="/path/to/document.pdf",
+    output_path="/path/to/watermarked.pdf",
+    watermark_text="CONFIDENTIAL"
+)
+
+# Diagonal watermark with custom opacity
+add_watermark(
+    file_path="/path/to/document.pdf",
+    output_path="/path/to/watermarked.pdf",
+    watermark_text="DRAFT",
+    position="diagonal",
+    opacity=0.5
+)
+```
+
+*Note: Requires reportlab: `pip install reportlab`*
+
+### Encrypt/Decrypt PDF
+
+```python
+# Password-protect a PDF
+encrypt_pdf(
+    file_path="/path/to/document.pdf",
+    output_path="/path/to/protected.pdf",
+    user_password="viewerpass",
+    owner_password="ownerpass",
+    allow_printing=True,
+    allow_copying=False
+)
+
+# Remove password protection
+decrypt_pdf(
+    file_path="/path/to/protected.pdf",
+    output_path="/path/to/unlocked.pdf",
+    password="viewerpass"
 )
 ```
 

@@ -4,7 +4,7 @@ Complete reference for all tools, resources, and prompts across the three MCP se
 
 ---
 
-## Server 1: gmail-mcp (93 tools)
+## Server 1: gmail-mcp (95 tools)
 
 ### Authentication (5 tools)
 
@@ -125,17 +125,19 @@ Complete reference for all tools, resources, and prompts across the three MCP se
 | `get_emails_for_claude_review` | Get emails flagged for review | `label_name`, `max_results` |
 | `create_claude_review_filter` | Create filter for Claude review | `from_address`, `subject_contains`, `query`, `review_type` |
 
-### Calendar (16 tools)
+### Calendar (18 tools)
 
 All calendar tools support **natural language dates**: `tomorrow`, `next monday`, `in 3 days`
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
 | `list_calendar_events` | List events | `max_results`, `time_min`*, `time_max`*, `query` |
+| `get_calendar_event` | Get single event by ID | `event_id`, `calendar_id` |
 | `create_calendar_event` | Create event | `summary`, `start_time`*, `end_time`*, `description`, `location`, `attendees`, `color_name`, `reminders` |
 | `create_recurring_event` | Create recurring event | `summary`, `start_time`*, `frequency`, `recurrence_pattern`*, `interval`, `count`, `until`, `by_day`, `reminders` |
 | `update_calendar_event` | Update event | `event_id`, `summary`, `start_time`*, `end_time`*, `description`, `location`, `reminders` |
 | `delete_calendar_event` | Delete event | `event_id` |
+| `duplicate_calendar_event` | Copy event to new time | `event_id`, `new_start_time`*, `new_summary`, `calendar_id` |
 | `rsvp_event` | Respond to invitation | `event_id`, `response` |
 | `detect_events_from_email` | Extract events from email | `email_id` |
 | `suggest_meeting_times` | Find available slots | `start_date`*, `end_date`*, `duration`/`duration_minutes`, `working_hours` |

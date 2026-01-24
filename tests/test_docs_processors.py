@@ -285,4 +285,4 @@ class TestDocsMcpTools:
         from docs_mcp.main import mcp
 
         tools = list(mcp._tool_manager._tools.keys())
-        assert len(tools) == 27, f"Expected 27 tools, got {len(tools)}"
+        assert len(tools) == 32, f"Expected 32 tools, got {len(tools)}"

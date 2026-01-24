@@ -2,16 +2,16 @@
 
 Extended fork of [bastienchabal/gmail-mcp](https://github.com/bastienchabal/gmail-mcp) - now a **monorepo with three MCP servers** for comprehensive Google Workspace and document processing.
 
-**Version 2.2.0** - Monorepo architecture with Drive and Docs servers.
+**Version 2.3.0** - Monorepo with complete backlog implementation.
 
 ## Three MCP Servers
 
 | Server | Tools | Google Auth | Use Case |
 |--------|-------|-------------|----------|
-| `gmail-mcp` | 93 | Yes | Email, Calendar, Contacts, Subscriptions |
-| `drive-mcp` | 43 | Yes | Google Drive files, folders, sharing, labels |
-| `docs-mcp` | 27 | No | Local DOCX/XLSX/PPTX/PDF processing, OCR, vault export |
-| **Total** | **163** | | |
+| `gmail-mcp` | 95 | Yes | Email, Calendar, Contacts, Subscriptions |
+| `drive-mcp` | 54 | Yes | Google Drive files, folders, sharing, labels, comments, revisions |
+| `docs-mcp` | 32 | No | Local DOCX/XLSX/PPTX/PDF processing, OCR, vault export |
+| **Total** | **181** | | |
 
 ### Deployment Flexibility
 

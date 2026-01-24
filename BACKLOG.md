@@ -14,16 +14,16 @@
 
 ---
 
-## Current State (2026-01-22)
+## Current State (2026-01-23)
 
-**Version:** 2.2.0 - Monorepo with 3 MCP servers
+**Version:** 2.3.0 - Monorepo with 3 MCP servers (backlog complete)
 
 | Server | Tools | Status |
 |--------|-------|--------|
-| gmail-mcp | 93 | Complete |
-| drive-mcp | 43 | Complete |
-| docs-mcp | 27 | Complete |
-| **Total** | **163** | |
+| gmail-mcp | 95 | Complete |
+| drive-mcp | 54 | Complete |
+| docs-mcp | 32 | Complete |
+| **Total** | **181** | |
 
 **Test baseline:** 417 passed, 5 warnings
 
@@ -33,15 +33,47 @@
 
 | Priority | Items | Status |
 |----------|-------|--------|
-| **P1 - High** | Calendar get/duplicate (#47-48) | Pending |
-| **P2 - Medium** | Drive star/comments (#39-43) | Pending |
-| **P3 - Low** | Drive shared drives admin (#36-38) | Pending (Workspace only) |
-| **P3 - Low** | Drive revisions (#44-46) | Pending |
-| **P3 - Low** | PDF advanced (#49-53) | Pending |
+| **P1 - High** | Calendar get/duplicate (#47-48) | ✅ Complete |
+| **P2 - Medium** | Drive star/comments (#39-43) | ✅ Complete |
+| **P3 - Low** | Drive shared drives admin (#36-38) | ✅ Complete |
+| **P3 - Low** | Drive revisions (#44-46) | ✅ Complete |
+| **P3 - Low** | PDF advanced (#49-53) | ✅ Complete |
 
 ---
 
 ## Recently Completed
+
+### 2026-01-23 - Backlog Complete
+
+**gmail-mcp - Calendar (2 new tools):**
+- `get_calendar_event` - Get single event by ID
+- `duplicate_calendar_event` - Copy an event to a new time
+
+**drive-mcp - File Actions (2 new tools):**
+- `star_drive_file` - Star a file for quick access
+- `unstar_drive_file` - Remove star from file
+
+**drive-mcp - Comments (3 new tools):**
+- `list_drive_comments` - List comments on a file
+- `add_drive_comment` - Add comment to a file
+- `delete_drive_comment` - Delete a comment
+
+**drive-mcp - Revisions (3 new tools):**
+- `list_drive_revisions` - List file version history
+- `get_drive_revision` - Get specific revision metadata
+- `download_drive_revision` - Download a previous version
+
+**drive-mcp - Shared Drives Admin (3 new tools):**
+- `create_shared_drive` - Create a new shared drive (Workspace admin)
+- `delete_shared_drive` - Delete a shared drive
+- `update_shared_drive` - Update shared drive name/settings
+
+**docs-mcp - PDF Advanced (5 new tools):**
+- `rotate_pdf` - Rotate pages in a PDF
+- `compress_pdf` - Reduce PDF file size
+- `add_watermark` - Add watermark to PDF pages
+- `encrypt_pdf` - Password-protect a PDF
+- `decrypt_pdf` - Remove password from PDF
 
 ### 2026-01-22 - Contact Hygiene, Subscription Management, Travel Buffer
 
@@ -94,48 +126,6 @@
 
 ---
 
-## Remaining Items
-
-### drive-mcp - Shared Drives (#36-38)
-
-*Requires Google Workspace admin permissions*
-
-- [ ] `create_shared_drive` - Create a new shared drive
-- [ ] `delete_shared_drive` - Delete a shared drive
-- [ ] `update_shared_drive` - Update shared drive name/settings
-
-### drive-mcp - File Actions (#39-40)
-
-- [ ] `star_drive_file` - Star a file for quick access
-- [ ] `unstar_drive_file` - Remove star from file
-
-### drive-mcp - Comments (#41-43)
-
-- [ ] `list_comments` - List comments on a file
-- [ ] `add_comment` - Add comment to a file
-- [ ] `delete_comment` - Delete a comment
-
-### drive-mcp - Revisions (#44-46)
-
-- [ ] `list_revisions` - List file version history
-- [ ] `get_revision` - Get specific revision metadata
-- [ ] `download_revision` - Download a previous version
-
-### gmail-mcp - Calendar (#47-48)
-
-- [ ] `get_calendar_event` - Get single event by ID (currently have list/update but not get)
-- [ ] `duplicate_calendar_event` - Quick copy of an event
-
-### docs-mcp - PDF Advanced (#49-53)
-
-- [ ] `rotate_pdf` - Rotate pages in a PDF
-- [ ] `compress_pdf` - Reduce PDF file size
-- [ ] `add_watermark` - Add watermark to PDF pages
-- [ ] `encrypt_pdf` - Password-protect a PDF
-- [ ] `decrypt_pdf` - Remove password from PDF
-
----
-
 ### Future Ideas (not planned)
 
 - **Import Contacts** - Import from CSV/vCard (requires contacts write scope)
@@ -165,6 +155,14 @@
 
 <details>
 <summary>Click to expand completed items</summary>
+
+### ✅ Backlog Complete (#36-53) - 2026-01-23
+- Calendar get/duplicate: `get_calendar_event()`, `duplicate_calendar_event()`
+- Drive star/unstar: `star_drive_file()`, `unstar_drive_file()`
+- Drive comments: `list_drive_comments()`, `add_drive_comment()`, `delete_drive_comment()`
+- Drive revisions: `list_drive_revisions()`, `get_drive_revision()`, `download_drive_revision()`
+- Shared drives admin: `create_shared_drive()`, `delete_shared_drive()`, `update_shared_drive()`
+- PDF advanced: `rotate_pdf()`, `compress_pdf()`, `add_watermark()`, `encrypt_pdf()`, `decrypt_pdf()`
 
 ### ✅ Contact Hygiene (#24-28) - 2026-01-22
 - `find_duplicate_contacts()` - Fuzzy matching with configurable threshold

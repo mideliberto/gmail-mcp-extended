@@ -1046,4 +1046,231 @@ def setup_tools(mcp: FastMCP) -> None:
             ocr_language=ocr_language,
         )
 
+    # =========================================================================
+    # Star/Unstar Operations (2 tools)
+    # =========================================================================
+
+    @mcp.tool()
+    def star_drive_file(file_id: str) -> Dict[str, Any]:
+        """
+        Star a file for quick access.
+
+        Starred files appear in the "Starred" section in Google Drive.
+
+        Args:
+            file_id: The ID of the file to star.
+
+        Returns:
+            Dict containing success status and file info.
+        """
+        processor = get_drive_processor()
+        return processor.star_file(file_id)
+
+    @mcp.tool()
+    def unstar_drive_file(file_id: str) -> Dict[str, Any]:
+        """
+        Remove star from a file.
+
+        Args:
+            file_id: The ID of the file to unstar.
+
+        Returns:
+            Dict containing success status and file info.
+        """
+        processor = get_drive_processor()
+        return processor.unstar_file(file_id)
+
+    # =========================================================================
+    # Comments Operations (3 tools)
+    # =========================================================================
+
+    @mcp.tool()
+    def list_drive_comments(
+        file_id: str,
+        max_results: int = 20,
+        page_token: Optional[str] = None,
+        include_deleted: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        List comments on a file.
+
+        Args:
+            file_id: The ID of the file.
+            max_results: Maximum number of comments to return (default: 20).
+            page_token: Token for pagination.
+            include_deleted: Whether to include deleted comments.
+
+        Returns:
+            Dict containing:
+                - comments: List of comment objects
+                - next_page_token: Token for next page (if exists)
+        """
+        processor = get_drive_processor()
+        return processor.list_comments(
+            file_id=file_id,
+            page_size=max_results,
+            page_token=page_token,
+            include_deleted=include_deleted,
+        )
+
+    @mcp.tool()
+    def add_drive_comment(
+        file_id: str,
+        content: str,
+    ) -> Dict[str, Any]:
+        """
+        Add a comment to a file.
+
+        Args:
+            file_id: The ID of the file.
+            content: The text content of the comment.
+
+        Returns:
+            Dict containing the created comment.
+        """
+        processor = get_drive_processor()
+        return processor.add_comment(file_id=file_id, content=content)
+
+    @mcp.tool()
+    def delete_drive_comment(file_id: str, comment_id: str) -> Dict[str, Any]:
+        """
+        Delete a comment from a file.
+
+        Args:
+            file_id: The ID of the file.
+            comment_id: The ID of the comment to delete.
+
+        Returns:
+            Dict containing success status.
+        """
+        processor = get_drive_processor()
+        return processor.delete_comment(file_id=file_id, comment_id=comment_id)
+
+    # =========================================================================
+    # Revisions Operations (3 tools)
+    # =========================================================================
+
+    @mcp.tool()
+    def list_drive_revisions(
+        file_id: str,
+        max_results: int = 10,
+        page_token: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        List revisions (version history) of a file.
+
+        Args:
+            file_id: The ID of the file.
+            max_results: Maximum number of revisions to return (default: 10).
+            page_token: Token for pagination.
+
+        Returns:
+            Dict containing:
+                - revisions: List of revision objects with metadata
+                - next_page_token: Token for next page (if exists)
+        """
+        processor = get_drive_processor()
+        return processor.list_revisions(
+            file_id=file_id,
+            page_size=max_results,
+            page_token=page_token,
+        )
+
+    @mcp.tool()
+    def get_drive_revision(file_id: str, revision_id: str) -> Dict[str, Any]:
+        """
+        Get metadata for a specific revision.
+
+        Args:
+            file_id: The ID of the file.
+            revision_id: The ID of the revision.
+
+        Returns:
+            Dict containing revision metadata.
+        """
+        processor = get_drive_processor()
+        return processor.get_revision(file_id=file_id, revision_id=revision_id)
+
+    @mcp.tool()
+    def download_drive_revision(
+        file_id: str,
+        revision_id: str,
+        output_path: str,
+    ) -> Dict[str, Any]:
+        """
+        Download a specific revision of a file.
+
+        Args:
+            file_id: The ID of the file.
+            revision_id: The ID of the revision.
+            output_path: Path to save the downloaded file.
+
+        Returns:
+            Dict containing success status and output path.
+        """
+        processor = get_drive_processor()
+        return processor.download_revision(
+            file_id=file_id,
+            revision_id=revision_id,
+            output_path=output_path,
+        )
+
+    # =========================================================================
+    # Shared Drive Admin Operations (3 tools) - Workspace only
+    # =========================================================================
+
+    @mcp.tool()
+    def create_shared_drive(name: str) -> Dict[str, Any]:
+        """
+        Create a new shared drive.
+
+        Note: Requires Google Workspace admin permissions.
+        Will fail for personal Gmail accounts.
+
+        Args:
+            name: Name for the shared drive.
+
+        Returns:
+            Dict containing the created shared drive info.
+        """
+        processor = get_drive_processor()
+        return processor.create_shared_drive(name=name)
+
+    @mcp.tool()
+    def delete_shared_drive(drive_id: str) -> Dict[str, Any]:
+        """
+        Delete a shared drive.
+
+        Note: Requires Google Workspace admin permissions.
+        The drive must be empty before deletion.
+
+        Args:
+            drive_id: The ID of the shared drive to delete.
+
+        Returns:
+            Dict containing success status.
+        """
+        processor = get_drive_processor()
+        return processor.delete_shared_drive(drive_id=drive_id)
+
+    @mcp.tool()
+    def update_shared_drive(
+        drive_id: str,
+        name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Update a shared drive's name.
+
+        Note: Requires Google Workspace admin permissions.
+
+        Args:
+            drive_id: The ID of the shared drive.
+            name: New name for the drive.
+
+        Returns:
+            Dict containing the updated shared drive info.
+        """
+        processor = get_drive_processor()
+        return processor.update_shared_drive(drive_id=drive_id, name=name)
+
     logger.info("Drive MCP tools registered successfully")

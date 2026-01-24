@@ -290,7 +290,7 @@ def setup_tools(mcp: FastMCP) -> None:
         return processor.pptx_to_markdown(file_path)
 
     # =========================================================================
-    # PDF Processing (7 tools)
+    # PDF Processing (12 tools)
     # =========================================================================
 
     @mcp.tool()
@@ -435,6 +435,143 @@ def setup_tools(mcp: FastMCP) -> None:
             result["encoding"] = "base64"
 
         return result
+
+    @mcp.tool()
+    def rotate_pdf(
+        file_path: str,
+        output_path: str,
+        rotation: int = 90,
+        pages: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Rotate pages in a PDF.
+
+        Args:
+            file_path: Path to the PDF file.
+            output_path: Where to save the rotated PDF.
+            rotation: Degrees to rotate (90, 180, or 270). Default 90.
+            pages: Page specification (e.g., "1-3,5"). If not provided, rotates all pages.
+
+        Returns:
+            Dict containing:
+                - success: Whether rotation succeeded
+                - output_path: Path to rotated PDF
+                - pages_rotated: Number of pages rotated
+                - rotation: Degrees rotated
+        """
+        processor = get_pdf_processor()
+        return processor.rotate_pdf(file_path, output_path, rotation, pages)
+
+    @mcp.tool()
+    def compress_pdf(
+        file_path: str,
+        output_path: str,
+        remove_duplication: bool = True,
+        remove_images: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Reduce PDF file size.
+
+        Args:
+            file_path: Path to the PDF file.
+            output_path: Where to save the compressed PDF.
+            remove_duplication: Remove duplicate objects. Default True.
+            remove_images: Remove all images to reduce size further. Default False.
+
+        Returns:
+            Dict containing:
+                - success: Whether compression succeeded
+                - output_path: Path to compressed PDF
+                - original_size: Original file size in bytes
+                - new_size: Compressed file size in bytes
+                - reduction_percent: Percentage reduction
+        """
+        processor = get_pdf_processor()
+        return processor.compress_pdf(file_path, output_path, remove_duplication, remove_images)
+
+    @mcp.tool()
+    def add_watermark(
+        file_path: str,
+        output_path: str,
+        watermark_text: str,
+        position: str = "center",
+        opacity: float = 0.3,
+    ) -> Dict[str, Any]:
+        """
+        Add watermark text to PDF pages.
+
+        Requires reportlab: pip install reportlab
+
+        Args:
+            file_path: Path to the PDF file.
+            output_path: Where to save the watermarked PDF.
+            watermark_text: Text to use as watermark (e.g., "CONFIDENTIAL", "DRAFT").
+            position: Watermark position - "center" or "diagonal". Default "center".
+            opacity: Watermark opacity from 0.0 (invisible) to 1.0 (solid). Default 0.3.
+
+        Returns:
+            Dict containing:
+                - success: Whether watermarking succeeded
+                - output_path: Path to watermarked PDF
+                - watermark: The watermark text used
+                - pages_watermarked: Number of pages watermarked
+        """
+        processor = get_pdf_processor()
+        return processor.add_watermark(file_path, output_path, watermark_text, position, opacity)
+
+    @mcp.tool()
+    def encrypt_pdf(
+        file_path: str,
+        output_path: str,
+        user_password: str,
+        owner_password: Optional[str] = None,
+        allow_printing: bool = True,
+        allow_copying: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Password-protect a PDF.
+
+        Args:
+            file_path: Path to the PDF file.
+            output_path: Where to save the encrypted PDF.
+            user_password: Password required to open the PDF.
+            owner_password: Password for full permissions. Defaults to user_password.
+            allow_printing: Allow printing when opened with user password. Default True.
+            allow_copying: Allow text copying when opened with user password. Default False.
+
+        Returns:
+            Dict containing:
+                - success: Whether encryption succeeded
+                - output_path: Path to encrypted PDF
+                - encrypted: True
+                - allow_printing: Whether printing is allowed
+                - allow_copying: Whether copying is allowed
+        """
+        processor = get_pdf_processor()
+        return processor.encrypt_pdf(file_path, output_path, user_password, owner_password, allow_printing, allow_copying)
+
+    @mcp.tool()
+    def decrypt_pdf(
+        file_path: str,
+        output_path: str,
+        password: str,
+    ) -> Dict[str, Any]:
+        """
+        Remove password protection from a PDF.
+
+        Args:
+            file_path: Path to the encrypted PDF file.
+            output_path: Where to save the decrypted PDF.
+            password: Password to unlock the PDF.
+
+        Returns:
+            Dict containing:
+                - success: Whether decryption succeeded
+                - output_path: Path to decrypted PDF
+                - decrypted: True
+        """
+        processor = get_pdf_processor()
+        return processor.decrypt_pdf(file_path, output_path, password)
 
     # =========================================================================
     # Local OCR - Tesseract (4 tools)
