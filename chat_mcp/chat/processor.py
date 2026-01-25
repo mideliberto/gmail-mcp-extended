@@ -12,6 +12,7 @@ from google.oauth2.credentials import Credentials
 
 from gmail_mcp.utils.logger import get_logger
 from gmail_mcp.auth.oauth import get_credentials
+from chat_mcp.chat.user_resolver import get_user_resolver
 
 logger = get_logger("chat_mcp.processor")
 
@@ -482,6 +483,7 @@ class ChatProcessor:
         filter_str: Optional[str] = None,
         show_groups: bool = False,
         show_invited: bool = False,
+        resolve_names: bool = True,
     ) -> Dict[str, Any]:
         """
         List members of a space.
@@ -493,9 +495,11 @@ class ChatProcessor:
             filter_str: Filter string for members.
             show_groups: Whether to include group members.
             show_invited: Whether to include invited members.
+            resolve_names: Whether to resolve user IDs to display names (default: True).
 
         Returns:
             Dict containing members list and nextPageToken.
+            Each member includes displayName and email when resolve_names=True.
         """
         service = self._get_service()
 
@@ -512,9 +516,32 @@ class ChatProcessor:
             request_params["filter"] = filter_str
 
         result = service.spaces().members().list(**request_params).execute()
+        members = result.get("memberships", [])
+
+        # Resolve user IDs to display names
+        if resolve_names and members:
+            try:
+                resolver = get_user_resolver()
+                user_names = []
+                for member in members:
+                    member_info = member.get("member", {})
+                    if member_info.get("type") == "HUMAN":
+                        user_names.append(member_info.get("name", ""))
+
+                resolved = resolver.resolve_many(user_names)
+
+                # Enrich member data with display names
+                for member in members:
+                    member_info = member.get("member", {})
+                    user_name = member_info.get("name", "")
+                    if user_name in resolved:
+                        member_info["displayName"] = resolved[user_name]["displayName"]
+                        member_info["email"] = resolved[user_name]["email"]
+            except Exception as e:
+                logger.warning(f"Failed to resolve user names: {e}")
 
         return {
-            "members": result.get("memberships", []),
+            "members": members,
             "nextPageToken": result.get("nextPageToken"),
         }
 
