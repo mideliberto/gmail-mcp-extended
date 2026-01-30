@@ -476,11 +476,17 @@ class Document:
         # Light gray background for inline code
         CODE_BG = {'red': 0.93, 'green': 0.93, 'blue': 0.93}
 
-        # Pattern for links, bold, italic, bold-italic, inline code
-        # Supports both * and _ for bold/italic
+        # Pattern for links, bold, italic, bold-italic, inline code, underline
+        # Supports both * and _ for bold/italic, ++ for underline
+        # Order matters: longer/more specific patterns first
         pattern = re.compile(
             r'(\[([^\]]+)\]\(([^)]+)\))|'      # [text](url)
             r'(`([^`]+)`)|'                    # `inline code`
+            r'(\+\+\*\*\*(.+?)\*\*\*\+\+)|'    # ++***bold italic underline***++
+            r'(\+\+\*\*(.+?)\*\*\+\+)|'        # ++**bold underline**++
+            r'(\+\+\*(.+?)\*\+\+)|'            # ++*italic underline*++
+            r'(\+\+(.+?)\+\+)|'                # ++underline++
+            r'(<u>(.+?)</u>)|'                 # <u>underline</u>
             r'(\*\*\*(.+?)\*\*\*)|'            # ***bold italic***
             r'(___(.+?)___)|'                  # ___bold italic___
             r'(\*\*(.+?)\*\*)|'                # **bold**
@@ -500,18 +506,28 @@ class Document:
                 runs.append(TextRun(text=match.group(2), link=match.group(3)))
             elif match.group(5):  # Inline code: `code`
                 runs.append(TextRun(text=match.group(5), font_family='Consolas', background=CODE_BG))
-            elif match.group(7):  # ***bold italic***
-                runs.append(TextRun(text=match.group(7), bold=True, italic=True))
-            elif match.group(9):  # ___bold italic___
-                runs.append(TextRun(text=match.group(9), bold=True, italic=True))
-            elif match.group(11):  # **bold**
-                runs.append(TextRun(text=match.group(11), bold=True))
-            elif match.group(13):  # __bold__
-                runs.append(TextRun(text=match.group(13), bold=True))
-            elif match.group(15):  # *italic*
-                runs.append(TextRun(text=match.group(15), italic=True))
-            elif match.group(17):  # _italic_
-                runs.append(TextRun(text=match.group(17), italic=True))
+            elif match.group(7):  # ++***bold italic underline***++
+                runs.append(TextRun(text=match.group(7), bold=True, italic=True, underline=True))
+            elif match.group(9):  # ++**bold underline**++
+                runs.append(TextRun(text=match.group(9), bold=True, underline=True))
+            elif match.group(11):  # ++*italic underline*++
+                runs.append(TextRun(text=match.group(11), italic=True, underline=True))
+            elif match.group(13):  # ++underline++
+                runs.append(TextRun(text=match.group(13), underline=True))
+            elif match.group(15):  # <u>underline</u>
+                runs.append(TextRun(text=match.group(15), underline=True))
+            elif match.group(17):  # ***bold italic***
+                runs.append(TextRun(text=match.group(17), bold=True, italic=True))
+            elif match.group(19):  # ___bold italic___
+                runs.append(TextRun(text=match.group(19), bold=True, italic=True))
+            elif match.group(21):  # **bold**
+                runs.append(TextRun(text=match.group(21), bold=True))
+            elif match.group(23):  # __bold__
+                runs.append(TextRun(text=match.group(23), bold=True))
+            elif match.group(25):  # *italic*
+                runs.append(TextRun(text=match.group(25), italic=True))
+            elif match.group(27):  # _italic_
+                runs.append(TextRun(text=match.group(27), italic=True))
 
             last_end = match.end()
 
