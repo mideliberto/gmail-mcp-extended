@@ -134,20 +134,28 @@ class GDocsTestBuilder:
             }
         })
 
+        # IMPORTANT: createParagraphBullets reduces document endIndex by 1
+        # (the trailing newline of the last bullet gets absorbed)
+        self.index -= 1
+
     def insert_table(self, headers: List[str], rows: List[List[str]]):
         """Insert a simple table."""
         num_cols = len(headers)
         num_rows = len(rows) + 1
-        table_start = self.index
+        insert_at = self.index
 
         # Insert table structure
         self.requests.append({
             "insertTable": {
                 "rows": num_rows,
                 "columns": num_cols,
-                "location": {"index": table_start},
+                "location": {"index": insert_at},
             }
         })
+
+        # IMPORTANT: insertTable at index N creates table at index N+1
+        # All subsequent table references must use the actual table start
+        table_start = insert_at + 1
 
         # Table structure size
         structure_size = 3 + num_rows * (num_cols * 2 + 1)
@@ -171,7 +179,8 @@ class GDocsTestBuilder:
         cell_formats = []
 
         for i, cell in enumerate(cell_data):
-            base_index = table_start + 4 + cell["row"] * (num_cols * 2 + 1) + cell["col"] * 2
+            # Cell index calculation uses actual table_start (not insert_at)
+            base_index = table_start + 3 + cell["row"] * (num_cols * 2 + 1) + cell["col"] * 2
 
             cell_inserts.append({
                 "insertText": {
@@ -201,7 +210,7 @@ class GDocsTestBuilder:
         self.requests.extend(reversed(cell_inserts))
         self.requests.extend(cell_formats)
 
-        # Header background
+        # Header background (uses actual table_start)
         self.requests.append({
             "updateTableCellStyle": {
                 "tableRange": {
@@ -252,9 +261,11 @@ class GDocsTestBuilder:
             }
         })
 
-        # Update index
+        # Update index to position after table
+        # table_start = insert_at + 1, table element size = structure_size - 1
+        # Position after table = insert_at + structure_size + total_content
         total_content = sum(len(c["text"]) for c in cell_data)
-        self.index = table_start + structure_size + total_content
+        self.index = insert_at + structure_size + total_content
 
         # Newline after table
         self.insert_text("\n")
@@ -310,7 +321,7 @@ def generate_test_requests(test_type: str = "foundation") -> List[Dict[str, Any]
     Generate test requests for the specified test type.
 
     Args:
-        test_type: "foundation", "table", or "full"
+        test_type: "foundation", "table", "full", or "minimal"
 
     Returns:
         List of batchUpdate requests
@@ -321,8 +332,24 @@ def generate_test_requests(test_type: str = "foundation") -> List[Dict[str, Any]
         return _generate_table_test()
     elif test_type == "full":
         return _generate_full_test()
+    elif test_type == "minimal":
+        return _generate_minimal_test()
     else:
-        raise ValueError(f"Unknown test_type: {test_type}. Use 'foundation', 'table', or 'full'.")
+        raise ValueError(f"Unknown test_type: {test_type}. Use 'foundation', 'table', 'full', or 'minimal'.")
+
+
+def _generate_minimal_test() -> List[Dict[str, Any]]:
+    """Minimal test: just a heading and paragraph to verify basic index tracking."""
+    builder = GDocsTestBuilder()
+
+    # Just heading + paragraph - no complex structures
+    builder.insert_heading("Minimal Test", 1)
+    builder.insert_paragraph("This is a simple paragraph.")
+    builder.insert_heading("Second Heading", 2)
+    builder.insert_paragraph("Another paragraph here.")
+
+    builder.insert_document_style()
+    return builder.get_requests()
 
 
 def _generate_foundation_test() -> List[Dict[str, Any]]:
