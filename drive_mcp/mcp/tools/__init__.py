@@ -1330,4 +1330,87 @@ def setup_tools(mcp: FastMCP) -> None:
         processor = get_drive_processor()
         return processor.debug_doc_structure(doc_id)
 
+    @mcp.tool()
+    def test_gdocs_render(
+        test_type: str = "foundation",
+    ) -> Dict[str, Any]:
+        """
+        Test tool: Create a Google Doc with test content to validate the gdocs builder.
+
+        Creates a document with structured content and returns the URL for manual verification.
+
+        Args:
+            test_type: Type of test to run:
+                - "foundation": Basic test with heading, paragraph, list, table, callout
+                - "table": Focused table test
+                - "full": Comprehensive test of all features
+
+        Returns:
+            Dict containing:
+                - success: Whether the test passed
+                - document_id: ID of the created document
+                - document_url: URL to view the document
+                - request_count: Number of API requests sent
+                - errors: List of any errors encountered
+        """
+        from drive_mcp.drive.gdocs_test import generate_test_requests
+
+        processor = get_drive_processor()
+
+        # Generate test requests
+        try:
+            requests = generate_test_requests(test_type)
+        except ValueError as e:
+            return {
+                "success": False,
+                "errors": [str(e)],
+            }
+
+        # Create empty document
+        try:
+            doc_result = processor.create_google_doc(
+                f"GDocs Builder Test - {test_type}",
+                parent_id=None,
+            )
+            doc_id = doc_result["id"]
+            doc_url = doc_result.get("webViewLink", f"https://docs.google.com/document/d/{doc_id}/edit")
+        except Exception as e:
+            return {
+                "success": False,
+                "errors": [f"Failed to create document: {e}"],
+            }
+
+        # Apply requests via batchUpdate
+        try:
+            docs_service = processor._get_docs_service()
+            result = docs_service.documents().batchUpdate(
+                documentId=doc_id,
+                body={"requests": requests},
+            ).execute()
+
+            return {
+                "success": True,
+                "document_id": doc_id,
+                "document_url": doc_url,
+                "request_count": len(requests),
+                "reply_count": len(result.get("replies", [])),
+                "errors": [],
+                "verify": [
+                    "1. Title 'Foundation Test Document' (H1)",
+                    "2. Paragraph with bold, italic, bold+italic runs",
+                    "3. Bullet list with 4 items (one nested)",
+                    "4. 3x3 table with header row styling",
+                    "5. Info callout with left border",
+                ],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "document_id": doc_id,
+                "document_url": doc_url,
+                "request_count": len(requests),
+                "errors": [f"batchUpdate failed: {e}"],
+            }
+
     logger.info("Drive MCP tools registered successfully")
