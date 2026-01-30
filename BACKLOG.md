@@ -34,7 +34,9 @@
 
 | Priority | Items | Status |
 |----------|-------|--------|
+| **P1 - High** | Google Docs formatting (#58) | ✅ Complete |
 | **P1 - High** | Calendar get/duplicate (#47-48) | ✅ Complete |
+| **P2 - Medium** | Professional doc styling (#59) | Open |
 | **P2 - Medium** | Drive star/comments (#39-43) | ✅ Complete |
 | **P3 - Low** | Drive shared drives admin (#36-38) | ✅ Complete |
 | **P3 - Low** | Drive revisions (#44-46) | ✅ Complete |
@@ -159,6 +161,49 @@
 ---
 
 ### Bugs / Missing
+
+- [x] **#58 - drive-mcp: Professional Google Docs creation (P1)** - ✅ Fixed 2026-01-29. `create_formatted_doc(name, markdown_content, parent_id)` now properly converts markdown to formatted Google Docs. Supports headings (H1-H6), bold/italic, bullet/numbered lists, horizontal rules, and tables (rendered as formatted text with bold headers). Key fix: insert all text in single operation, then apply formatting in reverse index order.
+
+- [ ] **#63 - drive-mcp: `create_formatted_doc` bold parsing broken (P2)** - Bold text mid-word or spanning formatted regions doesn't apply correctly. Example: "**Critical**" renders with bold at start and end but not middle. Likely an index calculation bug when applying `UpdateTextStyleRequest` - the start/end indices aren't capturing the full range.
+
+- [x] **#64 - drive-mcp: `create_formatted_doc` numbered lists don't enumerate (P1)** - ✅ Fixed 2026-01-30.
+
+  **Original issue:** Numbered lists rendered as "1. 1. 1." instead of "1. 2. 3." because each paragraph got a separate `listId`.
+
+  **Root cause:** `insertText` and `createParagraphBullets` were in separate batchUpdate calls. When paragraphs exist before bullets are applied in a separate API call, each paragraph gets its own `listId`.
+
+  **Fix:** Keep `createParagraphBullets` in the SAME batchUpdate as `insertText`. When all requests are in one batch, paragraphs share the same `listId` and enumerate correctly.
+
+  **Key insight:** From [Kanshi Tanaike's article](https://medium.com/google-cloud/techniques-for-creating-nested-lists-on-google-documents-using-google-docs-api-e6bd2c1718d8):
+  - Insert ALL text at once with `\n` separating paragraphs
+  - Apply `createParagraphBullets` with single range covering all paragraphs
+  - Both requests in the SAME batchUpdate
+
+  **References:**
+  - [Google Docs API: Work with lists](https://developers.google.com/workspace/docs/api/how-tos/lists)
+  - [CreateParagraphBulletsRequest docs](https://developers.google.com/docs/api/reference/rest/v1/documents/request)
+
+- [ ] **#60 - drive-mcp: Table cell styling API error (P2)** - `create_formatted_doc` fails on table cell styling with error: `oneof field 'cells' is already set. Cannot set 'tableRange'`. The API rejects requests that specify both fields. Tables are created but lack header styling. Fix: use either `cells` OR `tableRange` in `UpdateTableCellStyleRequest`, not both.
+
+- [ ] **#59 - drive-mcp: Professional document styling (P2)** - `create_formatted_doc` produces structurally correct but visually basic documents (plain fonts, no colors, default spacing). Claude.ai artifacts look polished because they render HTML/CSS. Options:
+  1. **Template-based:** Add `create_doc_from_template(template_id, replacements)` - clone a styled template, replace placeholder text
+  2. **Style presets:** Add `style_preset` param to `create_formatted_doc` (e.g., "proposal", "memo", "report") that applies predefined colors/fonts/spacing via `UpdateParagraphStyleRequest` and `UpdateTextStyleRequest`
+  3. **Full styling API:** Expose font, color, spacing params directly
+
+  Recommend: Template approach is cleanest. User creates styled templates in Docs UI, MCP clones and populates.
+
+- [ ] **#61 - drive-mcp: `create_drive_file` upload conversion control (P2)** - Uploading .docx files results in broken Google Docs (can't open). Drive tries to auto-convert but fails silently. Need `convert` parameter:
+  - `convert=False` (default): Keep as .docx, opens in compatibility mode. Preserves formatting, better for external sharing.
+  - `convert=True`: Force conversion to native Google Doc. Better for collaboration but may mangle formatting.
+
+  **Implementation:** In `processor.py` `create_file()`, when `convert=True`, set file metadata `mimeType` to `application/vnd.google-apps.document` to trigger explicit conversion. When `convert=False`, upload as-is without conversion.
+
+- [ ] **#62 - drive-mcp: Upload .docx with proper Google Doc conversion (P2)** - Related to #61. When user wants a native Google Doc from a .docx, provide reliable conversion path. Options:
+  1. Use Google Drive API import endpoint with explicit target mimeType
+  2. Add `upload_and_convert(file_path, target_format)` tool
+  3. Document that `create_formatted_doc` is preferred for Drive-native docs
+
+  **Workaround:** Use `create_formatted_doc` with markdown content for native Google Docs, or keep .docx as-is and download locally.
 
 - [ ] **#54 - drive-mcp: `create_label` missing** - Labels (6) has list, get, set, remove, search but no create. User tried to create "Processed" label, got "No such tool available". Either add `create_label` tool or document that labels must be created via Drive UI first.
 - [x] **#55 - gmail-mcp: `list_drafts` broken** - Fixed in 3aff5a2. Changed to format="full" instead of invalid metadataHeaders.

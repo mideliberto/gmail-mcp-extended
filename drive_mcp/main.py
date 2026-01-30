@@ -46,6 +46,7 @@ def get_drive_scopes() -> list:
         "https://www.googleapis.com/auth/drive",
         "https://www.googleapis.com/auth/drive.labels",
         "https://www.googleapis.com/auth/drive.activity.readonly",
+        "https://www.googleapis.com/auth/documents",
         # User info scopes
         "https://www.googleapis.com/auth/userinfo.email",
         "https://www.googleapis.com/auth/userinfo.profile",

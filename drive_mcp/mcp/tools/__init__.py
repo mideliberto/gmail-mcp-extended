@@ -455,6 +455,41 @@ def setup_tools(mcp: FastMCP) -> None:
         return processor.create_google_slides(name, parent_id)
 
     @mcp.tool()
+    def create_formatted_doc(
+        name: str,
+        markdown_content: str,
+        parent_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a Google Doc with formatted content from markdown.
+
+        Converts markdown to a professionally formatted Google Doc.
+
+        Supported markdown:
+        - Headings: # H1 through ###### H6
+        - Bold: **text** or __text__
+        - Italic: *text* or _text_
+        - Bullet lists: - item or * item
+        - Numbered lists: 1. item
+        - Horizontal rules: ---
+        - Tables: GFM pipe format (|col1|col2|)
+
+        Args:
+            name: The document name.
+            markdown_content: Markdown-formatted content to convert to Google Docs format.
+            parent_id: ID of the parent folder (optional).
+
+        Returns:
+            Dict containing:
+                - id: Document ID
+                - name: Document name
+                - mimeType: application/vnd.google-apps.document
+                - webViewLink: URL to view in browser
+        """
+        processor = get_drive_processor()
+        return processor.create_formatted_doc(name, markdown_content, parent_id)
+
+    @mcp.tool()
     def export_google_file(
         file_id: str,
         export_format: str,
@@ -1272,5 +1307,27 @@ def setup_tools(mcp: FastMCP) -> None:
         """
         processor = get_drive_processor()
         return processor.update_shared_drive(drive_id=drive_id, name=name)
+
+    # =========================================================================
+    # Debug Tools
+    # =========================================================================
+
+    @mcp.tool()
+    def debug_doc_structure(doc_id: str) -> Dict[str, Any]:
+        """
+        Debug tool: Get raw Google Docs structure including lists and paragraph bullets.
+
+        Use this to analyze how lists are structured in a document.
+
+        Args:
+            doc_id: The ID of the Google Doc to analyze.
+
+        Returns:
+            Dict containing:
+                - lists: The document's lists object (list definitions)
+                - paragraphs_with_bullets: List of paragraphs that have bullets
+        """
+        processor = get_drive_processor()
+        return processor.debug_doc_structure(doc_id)
 
     logger.info("Drive MCP tools registered successfully")

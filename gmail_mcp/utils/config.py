@@ -114,7 +114,8 @@ def get_config() -> Dict[str, Any]:
         "drive_api_enabled": drive_config.get("enabled", False),
         "drive_api_scopes": safe_split(drive_config.get("scopes", "https://www.googleapis.com/auth/drive,"
                                                 "https://www.googleapis.com/auth/drive.labels,"
-                                                "https://www.googleapis.com/auth/drive.activity.readonly")),
+                                                "https://www.googleapis.com/auth/drive.activity.readonly,"
+                                                "https://www.googleapis.com/auth/documents")),
 
         # Chat API configuration (from YAML)
         "chat_api_enabled": chat_config.get("enabled", False),

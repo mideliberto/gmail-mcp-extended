@@ -270,6 +270,7 @@ class TestDriveMcpTools:
             "share_drive_file",
             "get_drive_quota",
             "create_google_doc",
+            "create_formatted_doc",
         ]
 
         for tool in expected_tools:
@@ -280,4 +281,4 @@ class TestDriveMcpTools:
         from drive_mcp.main import mcp
 
         tools = list(mcp._tool_manager._tools.keys())
-        assert len(tools) == 54, f"Expected 54 tools, got {len(tools)}"
+        assert len(tools) == 56, f"Expected 56 tools, got {len(tools)}"

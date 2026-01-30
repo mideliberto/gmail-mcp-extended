@@ -5,6 +5,7 @@ This module provides functionality for interacting with the Google Drive API.
 """
 
 import io
+import json
 import mimetypes
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -54,6 +55,7 @@ class DriveProcessor:
     def __init__(self) -> None:
         """Initialize the Drive processor."""
         self._service = None
+        self._docs_service = None
 
     def _get_service(self) -> Any:
         """
@@ -71,6 +73,23 @@ class DriveProcessor:
                 raise RuntimeError("Not authenticated with Google")
             self._service = build("drive", "v3", credentials=credentials)
         return self._service
+
+    def _get_docs_service(self) -> Any:
+        """
+        Get the Google Docs API service.
+
+        Returns:
+            Any: The Google Docs API v1 service.
+
+        Raises:
+            RuntimeError: If authentication fails.
+        """
+        if self._docs_service is None:
+            credentials = get_credentials()
+            if not credentials:
+                raise RuntimeError("Not authenticated with Google")
+            self._docs_service = build("docs", "v1", credentials=credentials)
+        return self._docs_service
 
     # =========================================================================
     # Core File Operations
@@ -712,6 +731,137 @@ class DriveProcessor:
         )
 
         return result
+
+    def create_formatted_doc(
+        self,
+        name: str,
+        markdown_content: str,
+        parent_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a Google Doc with formatted content from markdown.
+
+        Supports:
+        - Headings (# through ######)
+        - Bold (**text** or __text__)
+        - Italic (*text* or _text_)
+        - Bullet lists (- item or * item)
+        - Numbered lists (1. item)
+        - Horizontal rules (---)
+        - Tables (GFM format)
+
+        Args:
+            name: The document name.
+            markdown_content: Markdown-formatted content to convert.
+            parent_id: ID of the parent folder (optional).
+
+        Returns:
+            Dict containing the created document metadata with webViewLink.
+        """
+        from drive_mcp.drive.gdocs_builder import markdown_to_docs_requests
+
+        drive_service = self._get_service()
+        docs_service = self._get_docs_service()
+
+        # Step 1: Create empty Google Doc via Drive API
+        file_metadata: Dict[str, Any] = {
+            "name": name,
+            "mimeType": GOOGLE_MIME_TYPES["document"],
+        }
+
+        if parent_id:
+            file_metadata["parents"] = [parent_id]
+
+        created_file = (
+            drive_service.files()
+            .create(body=file_metadata, fields="id, name, mimeType, webViewLink")
+            .execute()
+        )
+
+        doc_id = created_file["id"]
+
+        # Step 2: Convert markdown to Docs API requests
+        requests = markdown_to_docs_requests(markdown_content)
+
+        # Step 3: Apply formatting via Docs API batchUpdate
+        if requests:
+            # Debug: check for empty requests
+            empty_indices = [i for i, r in enumerate(requests) if not r or not list(r.keys())]
+            if empty_indices:
+                created_file["_debug_empty_at"] = empty_indices
+                # Filter out empty requests
+                requests = [r for r in requests if r and list(r.keys())]
+
+            # Split requests into batches:
+            # 1. Content + bullets - MUST be in same batch for proper list enumeration (bug #64)
+            # 2. Table styling - needs special position handling (separate batch)
+            table_style_requests = [r for r in requests if 'updateTableCellStyle' in r]
+            content_requests = [r for r in requests if 'updateTableCellStyle' not in r]
+
+            # Debug info
+            list_requests = [r for r in requests if 'createParagraphBullets' in r]
+            created_file["_debug_list_request_count"] = len(list_requests)
+            if list_requests:
+                created_file["_debug_list_requests"] = list_requests
+
+            try:
+                # Main batch: insert content AND apply bullets in same API call
+                # CRITICAL: createParagraphBullets must be in same batch as insertText
+                # for paragraphs to share the same listId and enumerate correctly
+                if content_requests:
+                    logger.info(f"Applying {len(content_requests)} content+bullet requests")
+                    docs_service.documents().batchUpdate(
+                        documentId=doc_id,
+                        body={"requests": content_requests},
+                    ).execute()
+
+                # Second batch: table styling with ACTUAL table positions
+                if table_style_requests:
+                    # Read document to find actual table positions
+                    doc = docs_service.documents().get(documentId=doc_id).execute()
+                    actual_table_starts = []
+                    for el in doc.get('body', {}).get('content', []):
+                        if 'table' in el:
+                            actual_table_starts.append(el.get('startIndex'))
+
+                    # Map calculated positions to actual positions
+                    # Extract unique calculated positions in order
+                    calculated_positions = []
+                    for req in table_style_requests:
+                        pos = req['updateTableCellStyle']['tableRange']['tableCellLocation']['tableStartLocation']['index']
+                        if pos not in calculated_positions:
+                            calculated_positions.append(pos)
+
+                    # Create position mapping
+                    position_map = {}
+                    for i, calc_pos in enumerate(calculated_positions):
+                        if i < len(actual_table_starts):
+                            position_map[calc_pos] = actual_table_starts[i]
+                            if calc_pos != actual_table_starts[i]:
+                                logger.info(f"Table position correction: {calc_pos} -> {actual_table_starts[i]}")
+
+                    # Fix up the table style requests with actual positions
+                    for req in table_style_requests:
+                        old_pos = req['updateTableCellStyle']['tableRange']['tableCellLocation']['tableStartLocation']['index']
+                        if old_pos in position_map:
+                            req['updateTableCellStyle']['tableRange']['tableCellLocation']['tableStartLocation']['index'] = position_map[old_pos]
+
+                    docs_service.documents().batchUpdate(
+                        documentId=doc_id,
+                        body={"requests": table_style_requests},
+                    ).execute()
+
+            except Exception as e:
+                logger.warning(f"Error applying formatting to doc {doc_id}: {e}")
+                created_file["formatting_error"] = str(e)
+                created_file["_debug_request_count"] = len(requests)
+                created_file["_debug_table_style_count"] = len(table_style_requests)
+                if requests:
+                    created_file["_debug_first_keys"] = list(requests[0].keys())
+                    # Dump first 3 requests to see structure
+                    created_file["_debug_first_3"] = json.dumps(requests[:3], default=str)
+
+        return created_file
 
     def export_google_file(
         self,
@@ -2073,6 +2223,67 @@ class DriveProcessor:
             "success": True,
             "message": "Shared drive updated",
             "drive": result,
+        }
+
+    # =========================================================================
+    # Debug Tools
+    # =========================================================================
+
+    def debug_doc_structure(self, doc_id: str) -> Dict[str, Any]:
+        """
+        Debug: Get raw Google Docs structure including lists and paragraph bullets.
+
+        Args:
+            doc_id: The ID of the Google Doc to analyze.
+
+        Returns:
+            Dict containing lists object and paragraphs with bullets.
+        """
+        docs_service = self._get_docs_service()
+        doc = docs_service.documents().get(documentId=doc_id).execute()
+
+        # Extract lists object
+        lists = doc.get('lists', {})
+        lists_info = {}
+        for list_id, list_def in lists.items():
+            props = list_def.get('listProperties', {})
+            nesting = props.get('nestingLevels', [])
+            level0 = nesting[0] if nesting else {}
+            lists_info[list_id] = {
+                "glyphType": level0.get('glyphType'),
+                "glyphFormat": level0.get('glyphFormat'),
+                "startNumber": level0.get('startNumber', 1),
+            }
+
+        # Extract paragraphs with bullets
+        paragraphs_with_bullets = []
+        body = doc.get('body', {})
+        for i, elem in enumerate(body.get('content', [])):
+            if 'paragraph' in elem:
+                para = elem['paragraph']
+                bullet = para.get('bullet')
+                if bullet:
+                    # Get text content
+                    text = ''
+                    for pel in para.get('elements', []):
+                        if 'textRun' in pel:
+                            text += pel['textRun'].get('content', '')
+                    text = text.strip()[:80]  # Truncate for display
+
+                    paragraphs_with_bullets.append({
+                        "index": i,
+                        "listId": bullet.get('listId'),
+                        "nestingLevel": bullet.get('nestingLevel', 0),
+                        "text": text,
+                    })
+
+        return {
+            "doc_id": doc_id,
+            "title": doc.get('title', 'Unknown'),
+            "list_count": len(lists),
+            "lists": lists_info,
+            "paragraphs_with_bullets": paragraphs_with_bullets,
+            "analysis": f"Document has {len(lists)} list(s) and {len(paragraphs_with_bullets)} bulleted paragraphs",
         }
 
 

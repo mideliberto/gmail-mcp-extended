@@ -4,7 +4,7 @@ This document outlines the structure of the Gmail MCP project.
 
 ```
 gmail-mcp/
-├── gmail_mcp/                     # Main package directory
+├── gmail_mcp/                     # Gmail/Calendar MCP server
 │   ├── auth/                      # Authentication modules
 │   │   ├── callback_server.py     # OAuth callback server
 │   │   ├── oauth.py               # OAuth2 flow implementation
@@ -30,21 +30,33 @@ gmail-mcp/
 │   │
 │   └── main.py                    # Entry point
 │
-├── tests/                         # Test suite (153 tests)
+├── drive_mcp/                     # Google Drive MCP server
+│   ├── drive/
+│   │   ├── processor.py           # Drive file operations
+│   │   └── gdocs_builder.py       # Google Docs formatting (markdown → API requests)
+│   │
+│   ├── mcp/
+│   │   ├── tools.py               # MCP tools (54 tools)
+│   │   └── schemas.py             # Pydantic schemas
+│   │
+│   └── main.py                    # Entry point
+│
+├── chat_mcp/                      # Google Chat MCP server
+│   └── ...
+│
+├── docs_mcp/                      # Local document processing (no auth)
+│   └── ...
+│
+├── tests/
 │   ├── test_token_manager.py      # Token manager tests
 │   ├── test_oauth.py              # OAuth flow tests
-│   ├── test_config.py             # Config tests
-│   ├── test_services.py           # Service caching tests
-│   ├── test_helpers.py            # Helper function tests
-│   ├── test_tools.py              # Gmail tool tests
-│   ├── test_calendar_processor.py # Calendar processor tests
-│   ├── test_calendar_tools.py     # Calendar tool tests
-│   ├── test_email_management.py   # Email management tests
-│   ├── test_labels_attachments.py # Labels/attachments tests
-│   └── test_bulk_and_reply.py     # Bulk ops/reply tests
+│   ├── test_docs_formatter.py     # gdocs_builder tests
+│   └── ...
 │
 ├── docs/                          # Documentation
 │   ├── overview.md                # Component overview
+│   ├── drive-mcp.md               # Drive tools reference
+│   ├── docs-mcp.md                # Local docs tools reference
 │   └── structure.md               # This file
 │
 ├── config.yaml                    # Application configuration
@@ -69,6 +81,11 @@ gmail-mcp/
 ### Calendar (calendar/)
 
 - **processor.py**: Natural language date parsing, event creation, meeting suggestions
+
+### Drive (drive_mcp/drive/)
+
+- **processor.py**: File operations, folder management, sharing, OCR
+- **gdocs_builder.py**: Markdown → Google Docs API requests. Produces professional docs with Arial font, styled tables (blue headers, gray borders), proper list formatting. Used by `create_formatted_doc` tool.
 
 ### MCP (mcp/)
 
