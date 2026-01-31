@@ -73,6 +73,21 @@
 
 **Workaround:** Track participant names in vault `0-inbox/chat-tracking.md` after manual identification.
 
+### #60 - docgen-mcp Auth Not Refreshed After Re-auth (P2)
+**Problem:** docgen-mcp (in `/Users/mike/Vaults/TMA/docgen-mcp/`) shares tokens with gmail-mcp but doesn't pick up refreshed tokens after re-authentication. Even after running `authenticate` tool with `drive` scope, docgen-mcp still fails with "invalid authentication credentials".
+
+**Root cause:**
+- docgen-mcp caches OAuth2Client in memory (`cachedClient` in `google-auth.ts`)
+- MCP server process must be restarted to reload tokens
+- Related to #56 but separate codebase
+
+**Workaround:** Restart Claude Code after re-authenticating.
+
+**Fix options:**
+1. Add `clear_credentials` function called before each API request if token is expired
+2. Add a health check/reload mechanism to docgen-mcp
+3. Share a reload signal between gmail-mcp and docgen-mcp
+
 ---
 
 ## Recently Completed

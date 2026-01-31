@@ -739,129 +739,39 @@ class DriveProcessor:
         parent_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Create a Google Doc with formatted content from markdown.
+        DEPRECATED: Use docgen-mcp's create_google_doc tool instead.
 
-        Supports:
-        - Headings (# through ######)
-        - Bold (**text** or __text__)
-        - Italic (*text* or _text_)
-        - Bullet lists (- item or * item)
-        - Numbered lists (1. item)
-        - Horizontal rules (---)
-        - Tables (GFM format)
+        This function previously converted markdown to Google Docs format using a regex parser.
+        That approach has been deprecated in favor of structured input via docgen-mcp.
 
         Args:
             name: The document name.
-            markdown_content: Markdown-formatted content to convert.
+            markdown_content: Markdown-formatted content (DEPRECATED).
             parent_id: ID of the parent folder (optional).
 
         Returns:
-            Dict containing the created document metadata with webViewLink.
+            Dict containing deprecation notice and migration instructions.
         """
-        from drive_mcp.drive.gdocs_builder import markdown_to_docs_requests
-
-        drive_service = self._get_service()
-        docs_service = self._get_docs_service()
-
-        # Step 1: Create empty Google Doc via Drive API
-        file_metadata: Dict[str, Any] = {
-            "name": name,
-            "mimeType": GOOGLE_MIME_TYPES["document"],
+        return {
+            "error": "DEPRECATED",
+            "message": "create_formatted_doc is deprecated. Use docgen-mcp's create_google_doc tool instead.",
+            "migration": {
+                "tool": "create_google_doc",
+                "mcp": "docgen-mcp",
+                "input_format": "Structured sections array, NOT markdown strings",
+                "example": {
+                    "title": name,
+                    "sections": [
+                        {"type": "heading", "level": 1, "text": "Title"},
+                        {"type": "paragraph", "content": "Body text"},
+                        {"type": "bullet_list", "items": ["Item 1", "Item 2"]},
+                    ],
+                    "config": "pwp",
+                    "folder_id": parent_id,
+                },
+            },
         }
 
-        if parent_id:
-            file_metadata["parents"] = [parent_id]
-
-        created_file = (
-            drive_service.files()
-            .create(body=file_metadata, fields="id, name, mimeType, webViewLink")
-            .execute()
-        )
-
-        doc_id = created_file["id"]
-
-        # Step 2: Convert markdown to Docs API requests
-        requests = markdown_to_docs_requests(markdown_content)
-
-        # Step 3: Apply formatting via Docs API batchUpdate
-        if requests:
-            # Debug: check for empty requests
-            empty_indices = [i for i, r in enumerate(requests) if not r or not list(r.keys())]
-            if empty_indices:
-                created_file["_debug_empty_at"] = empty_indices
-                # Filter out empty requests
-                requests = [r for r in requests if r and list(r.keys())]
-
-            # Split requests into batches:
-            # 1. Content + bullets - MUST be in same batch for proper list enumeration (bug #64)
-            # 2. Table styling - needs special position handling (separate batch)
-            table_style_requests = [r for r in requests if 'updateTableCellStyle' in r]
-            content_requests = [r for r in requests if 'updateTableCellStyle' not in r]
-
-            # Debug info
-            list_requests = [r for r in requests if 'createParagraphBullets' in r]
-            created_file["_debug_list_request_count"] = len(list_requests)
-            if list_requests:
-                created_file["_debug_list_requests"] = list_requests
-
-            try:
-                # Main batch: insert content AND apply bullets in same API call
-                # CRITICAL: createParagraphBullets must be in same batch as insertText
-                # for paragraphs to share the same listId and enumerate correctly
-                if content_requests:
-                    logger.info(f"Applying {len(content_requests)} content+bullet requests")
-                    docs_service.documents().batchUpdate(
-                        documentId=doc_id,
-                        body={"requests": content_requests},
-                    ).execute()
-
-                # Second batch: table styling with ACTUAL table positions
-                if table_style_requests:
-                    # Read document to find actual table positions
-                    doc = docs_service.documents().get(documentId=doc_id).execute()
-                    actual_table_starts = []
-                    for el in doc.get('body', {}).get('content', []):
-                        if 'table' in el:
-                            actual_table_starts.append(el.get('startIndex'))
-
-                    # Map calculated positions to actual positions
-                    # Extract unique calculated positions in order
-                    calculated_positions = []
-                    for req in table_style_requests:
-                        pos = req['updateTableCellStyle']['tableRange']['tableCellLocation']['tableStartLocation']['index']
-                        if pos not in calculated_positions:
-                            calculated_positions.append(pos)
-
-                    # Create position mapping
-                    position_map = {}
-                    for i, calc_pos in enumerate(calculated_positions):
-                        if i < len(actual_table_starts):
-                            position_map[calc_pos] = actual_table_starts[i]
-                            if calc_pos != actual_table_starts[i]:
-                                logger.info(f"Table position correction: {calc_pos} -> {actual_table_starts[i]}")
-
-                    # Fix up the table style requests with actual positions
-                    for req in table_style_requests:
-                        old_pos = req['updateTableCellStyle']['tableRange']['tableCellLocation']['tableStartLocation']['index']
-                        if old_pos in position_map:
-                            req['updateTableCellStyle']['tableRange']['tableCellLocation']['tableStartLocation']['index'] = position_map[old_pos]
-
-                    docs_service.documents().batchUpdate(
-                        documentId=doc_id,
-                        body={"requests": table_style_requests},
-                    ).execute()
-
-            except Exception as e:
-                logger.warning(f"Error applying formatting to doc {doc_id}: {e}")
-                created_file["formatting_error"] = str(e)
-                created_file["_debug_request_count"] = len(requests)
-                created_file["_debug_table_style_count"] = len(table_style_requests)
-                if requests:
-                    created_file["_debug_first_keys"] = list(requests[0].keys())
-                    # Dump first 3 requests to see structure
-                    created_file["_debug_first_3"] = json.dumps(requests[:3], default=str)
-
-        return created_file
 
     def export_google_file(
         self,
