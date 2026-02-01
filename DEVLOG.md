@@ -8,6 +8,16 @@
 
 ## 2026-02-01
 
+### CLAUDE.md and DEVLOG requirement
+**Origin:** Chat decision - development logging practice
+**Task:** Create project CLAUDE.md with DEVLOG requirement
+**Changes:**
+- Created CLAUDE.md with project info and DEVLOG requirement
+- Added this entry to DEVLOG.md
+**Commits:** [this commit]
+**Status:** Complete
+**Notes:** None
+
 ### rsvp_event calendar_id parameter
 **Origin:** Consistency fix (found during calendar_id work)
 **Task:** Add calendar_id parameter to rsvp_event for full consistency
