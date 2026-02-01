@@ -134,7 +134,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
             end_time (str, optional): The end time of the event. If not provided, you should ask the user for this information.
             description (str, optional): Description or notes for the event. If not provided, leave it blank.
             location (str, optional): Location of the event. If not provided, leave it blank.
-            attendees (List[str], optional): List of email addresses of attendees. The current user will always be added automatically.
+            attendees (List[str], optional): List of email addresses to invite. The event creator is not automatically added as an attendee.
             color_name (str, optional): Color name for the event (e.g., "red", "blue", "green", "purple", "yellow", "orange")
             reminders (List, optional): Custom reminders for the event. Can be:
                 - List of strings: ["30 minutes", "1 day before by email"]

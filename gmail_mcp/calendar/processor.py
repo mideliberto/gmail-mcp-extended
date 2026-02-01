@@ -531,22 +531,12 @@ def create_calendar_event_object(
     if location:
         event_body['location'] = location
     
-    # Handle attendees - always include the user's email
+    # Handle attendees - only add explicitly specified attendees
     event_attendees = []
-    
-    # Get the user's email
-    user_email = get_user_email()
-    
-    # Add user's email as an attendee if we have it
-    if user_email:
-        event_attendees.append({'email': user_email})
-    
-    # Add other attendees if provided
+
     if attendees:
         for email in attendees:
-            # Avoid adding duplicates
-            if email != user_email:
-                event_attendees.append({'email': email})
+            event_attendees.append({'email': email})
     
     # Only add attendees if we have at least one
     if event_attendees:
