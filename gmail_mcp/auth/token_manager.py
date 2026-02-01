@@ -185,7 +185,11 @@ class TokenManager:
 
             # Convert the expiry string to a datetime
             if token_data.get("expiry"):
-                token_data["expiry"] = datetime.fromisoformat(token_data["expiry"])
+                expiry = datetime.fromisoformat(token_data["expiry"])
+                # Convert to naive UTC (Google OAuth expects naive datetimes)
+                if expiry.tzinfo is not None:
+                    expiry = expiry.replace(tzinfo=None)
+                token_data["expiry"] = expiry
 
             # Create the credentials
             credentials = Credentials(

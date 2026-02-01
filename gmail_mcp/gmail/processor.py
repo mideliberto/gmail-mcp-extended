@@ -11,7 +11,7 @@ import email
 from email.header import decode_header
 from email.utils import parseaddr, parsedate_to_datetime
 from typing import Dict, Any, List, Optional, Tuple, Set
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 from googleapiclient.discovery import build
@@ -85,10 +85,13 @@ def parse_email_message(message: Dict[str, Any]) -> Tuple[EmailMetadata, EmailCo
     
     # Parse date
     date_str = headers.get("date", "")
-    date = datetime.now()  # Default to now if parsing fails
+    date = datetime.now(timezone.utc)  # Default to now if parsing fails
     if date_str:
         try:
             date = parsedate_to_datetime(date_str)
+            # Ensure timezone-aware (some emails have naive datetimes)
+            if date.tzinfo is None:
+                date = date.replace(tzinfo=timezone.utc)
         except Exception as e:
             logger.warning(f"Failed to parse date: {e}")
     
@@ -295,6 +298,9 @@ def analyze_thread(thread_id: str) -> Optional[Thread]:
             if date_str:
                 try:
                     date = parsedate_to_datetime(date_str)
+                    # Ensure timezone-aware (some emails have naive datetimes)
+                    if date.tzinfo is None:
+                        date = date.replace(tzinfo=timezone.utc)
                     if not last_message_date or date > last_message_date:
                         last_message_date = date
                 except Exception as e:
@@ -305,7 +311,7 @@ def analyze_thread(thread_id: str) -> Optional[Thread]:
             id=thread_id,
             subject=subject,
             participants=[{"email": p} for p in participants],
-            last_message_date=last_message_date or datetime.now(),
+            last_message_date=last_message_date or datetime.now(timezone.utc),
             message_count=len(messages)
         )
         
@@ -728,7 +734,7 @@ def find_related_emails(email_id: str, max_results: int = 10) -> List[Dict[str, 
                     relevance_score += 1
             
             # Score based on recency (newer = higher score)
-            days_old = (datetime.now() - related_metadata.date).days
+            days_old = (datetime.now(timezone.utc) - related_metadata.date).days
             recency_score = max(0, 5 - (days_old / 7))  # 5 points for current, decreasing by 1 per week
             relevance_score += recency_score
             

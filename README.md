@@ -1,17 +1,21 @@
 # Gmail MCP Extended
 
-Extended fork of [bastienchabal/gmail-mcp](https://github.com/bastienchabal/gmail-mcp) - now a **monorepo with three MCP servers** for comprehensive Google Workspace and document processing.
+Extended fork of [bastienchabal/gmail-mcp](https://github.com/bastienchabal/gmail-mcp) - now a **monorepo with four MCP servers** for comprehensive Google Workspace and document processing.
 
 **Version 2.3.0** - Monorepo with complete backlog implementation.
 
-## Three MCP Servers
+| [SETUP.md](SETUP.md) | [CHANGELOG.md](CHANGELOG.md) | [BACKLOG.md](BACKLOG.md) |
+|---------------------|------------------------------|--------------------------|
 
-| Server | Tools | Google Auth | Use Case |
-|--------|-------|-------------|----------|
-| `gmail-mcp` | 93 | Yes | Email, Calendar, Contacts, Subscriptions |
-| `drive-mcp` | 54 | Yes | Google Drive files, folders, sharing, labels, comments, revisions |
-| `docs-mcp` | 32 | No | Local DOCX/XLSX/PPTX/PDF processing, OCR, vault export |
-| **Total** | **179** | | |
+## Four MCP Servers
+
+| Server | Tools | Google Auth | Docs | Use Case |
+|--------|-------|-------------|------|----------|
+| `gmail-mcp` | 93 | Yes | [docs/gmail-mcp.md](docs/gmail-mcp.md) | Email, Calendar, Contacts, Subscriptions |
+| `drive-mcp` | 54 | Yes | [docs/drive-mcp.md](docs/drive-mcp.md) | Google Drive files, folders, sharing, labels |
+| `docs-mcp` | 32 | No | [docs/docs-mcp.md](docs/docs-mcp.md) | Local DOCX/XLSX/PPTX/PDF processing, OCR |
+| `chat-mcp` | 25 | Yes (Workspace) | [docs/chat-mcp.md](docs/chat-mcp.md) | Google Chat spaces, messages, members |
+| **Total** | **204** | | |
 
 ### Deployment Flexibility
 
@@ -58,7 +62,7 @@ brew install tesseract poppler  # macOS
 
 ### Google Cloud Setup
 
-Required for `gmail-mcp` and `drive-mcp`. See [docs/setup.md](docs/setup.md) for detailed guide.
+Required for `gmail-mcp` and `drive-mcp`. See [SETUP.md](SETUP.md) for detailed guide.
 
 1. Create project at [Google Cloud Console](https://console.cloud.google.com/)
 2. Enable APIs:

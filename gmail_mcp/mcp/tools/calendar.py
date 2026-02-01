@@ -877,13 +877,14 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
             return {"success": False, "error": f"Failed to delete calendar event: {e}"}
 
     @mcp.tool()
-    def rsvp_event(event_id: str, response: str) -> Dict[str, Any]:
+    def rsvp_event(event_id: str, response: str, calendar_id: str = "primary") -> Dict[str, Any]:
         """
         Respond to a calendar event invitation.
 
         Args:
             event_id (str): The ID of the event
             response (str): Response status - "accepted", "declined", or "tentative"
+            calendar_id (str, optional): The calendar ID. Defaults to "primary".
 
         Returns:
             Dict[str, Any]: Result of the operation
@@ -899,7 +900,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
         try:
             service = get_calendar_service(credentials)
 
-            event = service.events().get(calendarId="primary", eventId=event_id).execute()
+            event = service.events().get(calendarId=calendar_id, eventId=event_id).execute()
 
             gmail_service = get_gmail_service(credentials)
             profile = gmail_service.users().getProfile(userId="me").execute()
@@ -914,7 +915,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
             event["attendees"] = attendees
 
             updated_event = service.events().update(
-                calendarId="primary",
+                calendarId=calendar_id,
                 eventId=event_id,
                 body=event
             ).execute()
