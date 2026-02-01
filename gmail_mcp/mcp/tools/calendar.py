@@ -117,7 +117,8 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
         location: Optional[str] = None,
         attendees: Optional[List[str]] = None,
         color_name: Optional[str] = None,
-        reminders: Optional[List] = None
+        reminders: Optional[List] = None,
+        calendar_id: str = "primary"
     ) -> Dict[str, Any]:
         """
         Create a new event in the user's Google Calendar.
@@ -138,6 +139,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
             reminders (List, optional): Custom reminders for the event. Can be:
                 - List of strings: ["30 minutes", "1 day before by email"]
                 - List of dicts: [{"method": "popup", "minutes": 30}, {"method": "email", "minutes": 1440}]
+            calendar_id (str, optional): The calendar ID to create the event in. Defaults to "primary".
 
         Returns:
             Dict[str, Any]: The result of the operation, including:
@@ -215,7 +217,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
             # Remove internal _parsed field before sending to API
             event_body.pop("_parsed", None)
 
-            created_event = service.events().insert(calendarId="primary", body=event_body).execute()
+            created_event = service.events().insert(calendarId=calendar_id, body=event_body).execute()
 
             event_id = created_event.get("id", "")
             event_link = created_event.get("htmlLink", "")
@@ -282,7 +284,8 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
         until: Optional[str] = None,
         by_day: Optional[List[str]] = None,
         recurrence_pattern: Optional[str] = None,
-        reminders: Optional[List] = None
+        reminders: Optional[List] = None,
+        calendar_id: str = "primary"
     ) -> Dict[str, Any]:
         """
         Create a recurring event in the user's Google Calendar.
@@ -308,6 +311,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
             by_day (List[str], optional): Days of week for WEEKLY (e.g., ["MO", "WE", "FR"])
             recurrence_pattern (str, optional): Natural language recurrence pattern (e.g., "every weekday",
                 "weekly until march", "every monday and wednesday"). If provided, overrides frequency/interval/by_day.
+            calendar_id (str, optional): The calendar ID to create the event in. Defaults to "primary".
 
         Returns:
             Dict[str, Any]: The result including:
@@ -448,7 +452,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
             # Remove internal _parsed field before sending to API
             event_body.pop("_parsed", None)
 
-            created_event = service.events().insert(calendarId="primary", body=event_body).execute()
+            created_event = service.events().insert(calendarId=calendar_id, body=event_body).execute()
 
             event_id = created_event.get("id", "")
             event_link = created_event.get("htmlLink", "")
@@ -493,7 +497,8 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
         max_results: int = 10,
         time_min: Optional[str] = None,
         time_max: Optional[str] = None,
-        query: Optional[str] = None
+        query: Optional[str] = None,
+        calendar_id: str = "primary"
     ) -> Dict[str, Any]:
         """
         List events from the user's Google Calendar.
@@ -510,6 +515,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
             time_max (str, optional): End time for the search in ISO format or natural language.
                                      Defaults to unlimited.
             query (str, optional): Free text search terms to find events that match.
+            calendar_id (str, optional): The calendar ID to list events from. Defaults to "primary".
 
         Returns:
             Dict[str, Any]: The list of events including:
@@ -566,7 +572,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
                 time_max_formatted = time_max_dt.isoformat() + 'Z' if not time_max_dt.tzinfo else time_max_dt.isoformat()
 
             params = {
-                'calendarId': 'primary',
+                'calendarId': calendar_id,
                 'timeMin': time_min_formatted,
                 'maxResults': max_results,
                 'singleEvents': True,
@@ -760,7 +766,8 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
         end_time: Optional[str] = None,
         description: Optional[str] = None,
         location: Optional[str] = None,
-        reminders: Optional[List] = None
+        reminders: Optional[List] = None,
+        calendar_id: str = "primary"
     ) -> Dict[str, Any]:
         """
         Update an existing calendar event.
@@ -775,6 +782,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
             reminders (List, optional): Custom reminders. Can be:
                 - List of strings: ["30 minutes", "1 day before by email"]
                 - List of dicts: [{"method": "popup", "minutes": 30}]
+            calendar_id (str, optional): The calendar ID. Defaults to "primary".
 
         Returns:
             Dict[str, Any]: Updated event details
@@ -787,7 +795,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
         try:
             service = get_calendar_service(credentials)
 
-            event = service.events().get(calendarId="primary", eventId=event_id).execute()
+            event = service.events().get(calendarId=calendar_id, eventId=event_id).execute()
 
             if summary:
                 event["summary"] = summary
@@ -819,7 +827,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
                     }
 
             updated_event = service.events().update(
-                calendarId="primary",
+                calendarId=calendar_id,
                 eventId=event_id,
                 body=event
             ).execute()
@@ -837,12 +845,13 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
             return {"success": False, "error": f"Failed to update calendar event: {e}"}
 
     @mcp.tool()
-    def delete_calendar_event(event_id: str) -> Dict[str, Any]:
+    def delete_calendar_event(event_id: str, calendar_id: str = "primary") -> Dict[str, Any]:
         """
         Delete a calendar event.
 
         Args:
             event_id (str): The ID of the event to delete
+            calendar_id (str, optional): The calendar ID. Defaults to "primary".
 
         Returns:
             Dict[str, Any]: Result of the operation
@@ -855,7 +864,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
         try:
             service = get_calendar_service(credentials)
 
-            service.events().delete(calendarId="primary", eventId=event_id).execute()
+            service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
 
             return {
                 "success": True,
@@ -925,7 +934,8 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
     def add_travel_buffer(
         event_id: str,
         minutes: int = 30,
-        label: str = "Travel time"
+        label: str = "Travel time",
+        calendar_id: str = "primary"
     ) -> Dict[str, Any]:
         """
         Add a travel buffer event before an existing calendar event.
@@ -939,6 +949,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
             minutes (int, optional): Duration of travel buffer in minutes. Defaults to 30.
             label (str, optional): Label for the buffer event. Defaults to "Travel time".
                 The main event's title will be appended automatically.
+            calendar_id (str, optional): The calendar ID. Defaults to "primary".
 
         Returns:
             Dict[str, Any]: Result including:
@@ -966,7 +977,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
             service = get_calendar_service(credentials)
 
             # Get the target event
-            event = service.events().get(calendarId="primary", eventId=event_id).execute()
+            event = service.events().get(calendarId=calendar_id, eventId=event_id).execute()
 
             event_summary = event.get("summary", "Event")
             start = event.get("start", {})
@@ -1010,7 +1021,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
 
             # Check for conflicts
             conflicts = service.events().list(
-                calendarId="primary",
+                calendarId=calendar_id,
                 timeMin=buffer_start.isoformat(),
                 timeMax=buffer_end.isoformat(),
                 singleEvents=True
@@ -1034,7 +1045,7 @@ def setup_calendar_tools(mcp: FastMCP) -> None:
 
             # Create the buffer event
             created_buffer = service.events().insert(
-                calendarId="primary",
+                calendarId=calendar_id,
                 body=buffer_body
             ).execute()
 
