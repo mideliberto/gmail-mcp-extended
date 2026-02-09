@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-02-09
+
+### Shared file search and text export for Drive MCP
+**Origin:** Chat spec - PWP workflow requirements
+**Task:** Add shared_with_me parameter to search and export_format parameter to read
+**Changes:**
+- processor.py: Added shared_with_me parameter to search_files(), appends sharedWithMe = true to query
+- processor.py: Added export_format parameter to read_file(), returns correct export mime type for text detection
+- tools/__init__.py: Added shared_with_me to search_drive_files with docstring
+- tools/__init__.py: Added export_format to read_drive_file with full docstring for formats
+**Commits:** [this commit]
+**Status:** Complete
+**Notes:** Critical fix - mime_type now set to export mime (e.g., text/plain) so tool layer text detection works
+
+---
+
 ## 2026-02-01
 
 ### Hierarchical CLAUDE.md structure

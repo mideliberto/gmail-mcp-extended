@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-02-09
+
+**Added:**
+- `search_drive_files`: Added `shared_with_me` parameter to search files shared by others
+- `read_drive_file`: Added `export_format` parameter for Google Workspace files (txt, csv, html, etc.)
+
 ## 2026-02-01
 
 **Fixed:**

@@ -153,6 +153,7 @@ class DriveProcessor:
         modified_after: Optional[str] = None,
         modified_before: Optional[str] = None,
         owner_email: Optional[str] = None,
+        shared_with_me: Optional[bool] = None,
         page_size: int = 10,
         page_token: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -195,6 +196,8 @@ class DriveProcessor:
                 query_parts.append(f"modifiedTime < '{modified_before}'")
             if owner_email:
                 query_parts.append(f"'{owner_email}' in owners")
+            if shared_with_me:
+                query_parts.append("sharedWithMe = true")
 
             search_query = " and ".join(query_parts)
 
@@ -235,7 +238,7 @@ class DriveProcessor:
 
         return result
 
-    def read_file(self, file_id: str) -> Tuple[bytes, str, str]:
+    def read_file(self, file_id: str, export_format: Optional[str] = None) -> Tuple[bytes, str, str]:
         """
         Download/read file content.
 
@@ -244,6 +247,7 @@ class DriveProcessor:
 
         Args:
             file_id: The ID of the file.
+            export_format: Export format for Google Workspace files (e.g., "txt", "pdf").
 
         Returns:
             Tuple of (content bytes, mime_type, filename).
@@ -257,9 +261,19 @@ class DriveProcessor:
 
         # Check if it's a Google Workspace file
         if mime_type in EXPORT_MIME_TYPES:
-            # Export Google Workspace file - default to PDF
-            export_mime = EXPORT_MIME_TYPES[mime_type].get("pdf", "application/pdf")
+            # Use requested format, fall back to pdf
+            fmt = export_format or "pdf"
+            available = EXPORT_MIME_TYPES[mime_type]
+            if fmt not in available:
+                raise ValueError(
+                    f"Format '{fmt}' not available for {mime_type}. "
+                    f"Available: {list(available.keys())}"
+                )
+            export_mime = available[fmt]
             request = service.files().export_media(fileId=file_id, mimeType=export_mime)
+            # CRITICAL: Return the export mime type, not the source mime type.
+            # The tool layer uses this to decide text vs base64 encoding.
+            mime_type = export_mime
         else:
             # Download regular file
             request = service.files().get_media(fileId=file_id)

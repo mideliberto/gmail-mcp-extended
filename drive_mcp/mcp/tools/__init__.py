@@ -63,6 +63,7 @@ def setup_tools(mcp: FastMCP) -> None:
         modified_after: Optional[str] = None,
         modified_before: Optional[str] = None,
         owner_email: Optional[str] = None,
+        shared_with_me: Optional[bool] = None,
         max_results: int = 10,
         page_token: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -80,6 +81,7 @@ def setup_tools(mcp: FastMCP) -> None:
             modified_after: ISO date string (e.g., "2024-01-01T00:00:00Z").
             modified_before: ISO date string for upper bound.
             owner_email: Filter by owner's email address.
+            shared_with_me: If True, search only files shared with you by others.
             max_results: Maximum number of results (default: 10, max: 100).
             page_token: Token for pagination.
 
@@ -99,6 +101,7 @@ def setup_tools(mcp: FastMCP) -> None:
             modified_after=modified_after,
             modified_before=modified_before,
             owner_email=owner_email,
+            shared_with_me=shared_with_me,
             page_size=min(max_results, 100),
             page_token=page_token,
         )
@@ -123,26 +126,39 @@ def setup_tools(mcp: FastMCP) -> None:
         return processor.get_file(file_id)
 
     @mcp.tool()
-    def read_drive_file(file_id: str) -> Dict[str, Any]:
+    def read_drive_file(
+        file_id: str,
+        export_format: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Download and read the content of a file.
 
-        For Google Workspace files (Docs, Sheets, Slides), exports as PDF.
-        For text files, returns the text content.
-        For binary files, returns base64-encoded content.
+        For Google Workspace files (Docs, Sheets, Slides), exports in the
+        requested format. Defaults to PDF if not specified.
+
+        Supported export formats:
+          - Google Docs: pdf, docx, txt, html
+          - Google Sheets: pdf, xlsx, csv
+          - Google Slides: pdf, pptx
+
+        For regular (non-Google) files, downloads content directly
+        (export_format is ignored).
 
         Args:
             file_id: The ID of the file to read.
+            export_format: Export format for Google Workspace files.
+                Use "txt" to get plain text content from Google Docs.
+                Defaults to "pdf" if not specified.
 
         Returns:
             Dict containing:
                 - filename: Original filename
-                - mime_type: MIME type of the file
+                - mime_type: MIME type of the exported/downloaded content
                 - content: File content (text for text files, base64 for binary)
                 - encoding: "text" or "base64"
         """
         processor = get_drive_processor()
-        content, mime_type, filename = processor.read_file(file_id)
+        content, mime_type, filename = processor.read_file(file_id, export_format=export_format)
 
         # Try to decode as text for text-based formats
         text_types = ["text/", "application/json", "application/xml"]
