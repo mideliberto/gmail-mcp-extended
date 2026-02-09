@@ -8,6 +8,15 @@
 
 ## 2026-02-09
 
+### Fix labelIds KeyError on empty/missing labels
+**Origin:** Bug report - get_email fails on scheduled sends
+**Task:** Replace unsafe msg["labelIds"] with msg.get("labelIds", [])
+**Changes:**
+- gmail_mcp/mcp/tools/email_read.py:208 - changed to safe .get() access
+**Commits:** [this commit]
+**Status:** Complete
+**Notes:** Only one unsafe access found; other labelIds references already used .get()
+
 ### Shared file search and text export for Drive MCP
 **Origin:** Chat spec - PWP workflow requirements
 **Task:** Add shared_with_me parameter to search and export_format parameter to read
@@ -16,7 +25,7 @@
 - processor.py: Added export_format parameter to read_file(), returns correct export mime type for text detection
 - tools/__init__.py: Added shared_with_me to search_drive_files with docstring
 - tools/__init__.py: Added export_format to read_drive_file with full docstring for formats
-**Commits:** [this commit]
+**Commits:** 01dc39e
 **Status:** Complete
 **Notes:** Critical fix - mime_type now set to export mime (e.g., text/plain) so tool layer text detection works
 

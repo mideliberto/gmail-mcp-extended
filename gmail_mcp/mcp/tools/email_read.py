@@ -205,7 +205,7 @@ def setup_email_read_tools(mcp: FastMCP) -> None:
                 "date": headers.get("date", "Unknown"),
                 "body": body,
                 "snippet": msg["snippet"],
-                "labels": msg["labelIds"],
+                "labels": msg.get("labelIds", []),
                 "email_link": email_link
             }
 
