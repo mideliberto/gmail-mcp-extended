@@ -6,6 +6,8 @@ This module provides all the tool definitions for the Drive MCP server.
 
 from typing import Any, Dict, List, Optional
 import base64
+import mimetypes
+import os
 
 from mcp.server.fastmcp import FastMCP
 
@@ -186,8 +188,9 @@ def setup_tools(mcp: FastMCP) -> None:
     @mcp.tool()
     def create_drive_file(
         name: str,
-        content: str,
-        mime_type: str = "text/plain",
+        content: Optional[str] = None,
+        file_path: Optional[str] = None,
+        mime_type: Optional[str] = None,
         parent_id: Optional[str] = None,
         description: Optional[str] = None,
         encoding: str = "text",
@@ -195,18 +198,54 @@ def setup_tools(mcp: FastMCP) -> None:
         """
         Upload a new file to Google Drive.
 
+        Provide either content (inline text/base64) or file_path (local file),
+        but not both.
+
+        When using file_path, the file is streamed from disk without loading
+        into memory, making it suitable for large files. If mime_type is not
+        specified, it is auto-detected from the file extension.
+
         Args:
             name: The filename for the new file.
-            content: File content (text or base64-encoded).
-            mime_type: MIME type of the file (default: "text/plain").
+            content: File content (text or base64-encoded). Mutually exclusive with file_path.
+            file_path: Path to a local file to upload. Mutually exclusive with content.
+            mime_type: MIME type of the file. If not specified, defaults to
+                "text/plain" for inline content or auto-detected from file
+                extension for file_path (falling back to "application/octet-stream").
             parent_id: ID of the parent folder. If not provided, uploads to root.
             description: Optional file description.
             encoding: Content encoding - "text" or "base64" (default: "text").
+                Only used with content, ignored when file_path is provided.
 
         Returns:
             Dict containing the created file metadata.
         """
+        if content is not None and file_path is not None:
+            raise ValueError("Cannot specify both 'content' and 'file_path'")
+        if content is None and file_path is None:
+            raise ValueError("Must specify either 'content' or 'file_path'")
+
         processor = get_drive_processor()
+
+        if file_path is not None:
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"File not found: {file_path}")
+
+            if mime_type is None:
+                guessed, _ = mimetypes.guess_type(file_path)
+                mime_type = guessed or "application/octet-stream"
+
+            return processor.create_file_from_path(
+                name=name,
+                file_path=file_path,
+                mime_type=mime_type,
+                parent_id=parent_id,
+                description=description,
+            )
+
+        # Content-based upload (existing behavior)
+        if mime_type is None:
+            mime_type = "text/plain"
 
         if encoding == "base64":
             content_bytes = base64.b64decode(content)
@@ -225,23 +264,55 @@ def setup_tools(mcp: FastMCP) -> None:
     def update_drive_file(
         file_id: str,
         content: Optional[str] = None,
+        file_path: Optional[str] = None,
         mime_type: Optional[str] = None,
         encoding: str = "text",
     ) -> Dict[str, Any]:
         """
         Update an existing file's content.
 
+        Provide either content (inline text/base64) or file_path (local file),
+        but not both.
+
+        When using file_path, the file is streamed from disk without loading
+        into memory. If mime_type is not specified, it is auto-detected from
+        the file extension.
+
         Args:
             file_id: The ID of the file to update.
-            content: New file content (text or base64-encoded).
-            mime_type: MIME type (required if updating content).
+            content: New file content (text or base64-encoded). Mutually exclusive with file_path.
+            file_path: Path to a local file to upload. Mutually exclusive with content.
+            mime_type: MIME type. If not specified, auto-detected from file_path
+                extension (falling back to "application/octet-stream") or required
+                when using content.
             encoding: Content encoding - "text" or "base64" (default: "text").
+                Only used with content, ignored when file_path is provided.
 
         Returns:
             Dict containing the updated file metadata.
         """
+        if content is not None and file_path is not None:
+            raise ValueError("Cannot specify both 'content' and 'file_path'")
+        if content is None and file_path is None:
+            raise ValueError("Must specify either 'content' or 'file_path'")
+
         processor = get_drive_processor()
 
+        if file_path is not None:
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"File not found: {file_path}")
+
+            if mime_type is None:
+                guessed, _ = mimetypes.guess_type(file_path)
+                mime_type = guessed or "application/octet-stream"
+
+            return processor.update_file_from_path(
+                file_id=file_id,
+                file_path=file_path,
+                mime_type=mime_type,
+            )
+
+        # Content-based update (existing behavior)
         content_bytes = None
         if content is not None:
             if encoding == "base64":

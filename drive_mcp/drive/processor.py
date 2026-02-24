@@ -329,6 +329,48 @@ class DriveProcessor:
 
         return result
 
+    def create_file_from_path(
+        self,
+        name: str,
+        file_path: str,
+        mime_type: str,
+        parent_id: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Upload a new file from a local file path.
+
+        Streams from disk using MediaFileUpload instead of loading into memory.
+
+        Args:
+            name: The filename.
+            file_path: Path to the local file.
+            mime_type: MIME type of the file.
+            parent_id: ID of the parent folder. If None, uploads to root.
+            description: Optional file description.
+
+        Returns:
+            Dict containing the created file metadata.
+        """
+        service = self._get_service()
+
+        file_metadata: Dict[str, Any] = {"name": name}
+
+        if parent_id:
+            file_metadata["parents"] = [parent_id]
+        if description:
+            file_metadata["description"] = description
+
+        media = MediaFileUpload(file_path, mimetype=mime_type, resumable=True)
+
+        result = (
+            service.files()
+            .create(body=file_metadata, media_body=media, fields="id, name, mimeType, webViewLink")
+            .execute()
+        )
+
+        return result
+
     def update_file(
         self,
         file_id: str,
@@ -380,6 +422,41 @@ class DriveProcessor:
                 )
                 .execute()
             )
+
+        return result
+
+    def update_file_from_path(
+        self,
+        file_id: str,
+        file_path: str,
+        mime_type: str,
+    ) -> Dict[str, Any]:
+        """
+        Update an existing file's content from a local file path.
+
+        Streams from disk using MediaFileUpload instead of loading into memory.
+
+        Args:
+            file_id: The ID of the file to update.
+            file_path: Path to the local file.
+            mime_type: MIME type of the file.
+
+        Returns:
+            Dict containing the updated file metadata.
+        """
+        service = self._get_service()
+
+        media = MediaFileUpload(file_path, mimetype=mime_type, resumable=True)
+
+        result = (
+            service.files()
+            .update(
+                fileId=file_id,
+                media_body=media,
+                fields="id, name, mimeType, modifiedTime, webViewLink",
+            )
+            .execute()
+        )
 
         return result
 

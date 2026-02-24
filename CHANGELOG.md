@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- `create_drive_file`: Added `file_path` parameter for streaming large file uploads from disk via MediaFileUpload
+- `update_drive_file`: Added `file_path` parameter for streaming large file updates from disk via MediaFileUpload
+- `DriveProcessor.create_file_from_path()`: New method using MediaFileUpload for disk-based uploads
+- `DriveProcessor.update_file_from_path()`: New method using MediaFileUpload for disk-based updates
+
 ## 2026-02-09
 
 **Added:**

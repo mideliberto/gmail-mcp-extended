@@ -6,6 +6,23 @@
 
 ---
 
+## 2026-02-23
+
+### Add file_path parameter to create_drive_file and update_drive_file
+**Origin:** Chat decision
+**Task:** Add file_path parameter for large file uploads that bypass MCP parameter size limits
+**Changes:**
+- Added `file_path` parameter to `create_drive_file` and `update_drive_file` tool definitions
+- Changed `mime_type` default to `None` with auto-detection from file extension
+- Added mutual exclusivity validation (content vs file_path)
+- Added `create_file_from_path()` and `update_file_from_path()` to DriveProcessor using MediaFileUpload
+- Files modified: `drive_mcp/mcp/tools/__init__.py`, `drive_mcp/drive/processor.py`, `CHANGELOG.md`
+**Commits:** (see below)
+**Status:** Complete
+**Notes:** MediaFileUpload was already imported but unused. Existing content-based code paths unchanged.
+
+---
+
 ## 2026-02-09
 
 ### Fix labelIds KeyError on empty/missing labels
