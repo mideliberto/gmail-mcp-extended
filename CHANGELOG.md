@@ -8,6 +8,9 @@
 - `DriveProcessor.create_file_from_path()`: New method using MediaFileUpload for disk-based uploads
 - `DriveProcessor.update_file_from_path()`: New method using MediaFileUpload for disk-based updates
 
+### Changed
+- Replaced `debug_user_resolver` with `get_directory_status` (read-only cache check) and `refresh_directory_cache` (clear + repopulate from People API)
+
 ## 2026-02-09
 
 **Added:**

@@ -8,6 +8,18 @@
 
 ## 2026-02-23
 
+### Replace debug_user_resolver with get_directory_status and refresh_directory_cache
+**Origin:** Chat decision
+**Task:** Split debug_user_resolver (which combined cache population with status check) into two properly named tools
+**Changes:**
+- Removed `debug_user_resolver` tool
+- Added `get_directory_status` — read-only cache stats, no side effects
+- Added `refresh_directory_cache` — clears cache, repopulates from People API, returns stats
+- File modified: `chat_mcp/mcp/tools/__init__.py`
+**Commits:** (see below)
+**Status:** Complete
+**Notes:** Underlying `user_resolver.py` unchanged. Same return structure from `get_cache_stats()`.
+
 ### Add file_path parameter to create_drive_file and update_drive_file
 **Origin:** Chat decision
 **Task:** Add file_path parameter for large file uploads that bypass MCP parameter size limits

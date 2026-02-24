@@ -562,11 +562,11 @@ def setup_tools(mcp: FastMCP) -> None:
         return processor.check_auth()
 
     @mcp.tool()
-    def debug_user_resolver() -> Dict[str, Any]:
+    def get_directory_status() -> Dict[str, Any]:
         """
-        Debug the user resolver cache status.
+        Get the current status of the directory user cache.
 
-        Returns stats about the directory user cache including any errors.
+        Read-only check. Does not fetch from the People API or modify the cache.
 
         Returns:
             Dict containing:
@@ -575,7 +575,24 @@ def setup_tools(mcp: FastMCP) -> None:
                 - last_error: Last error message (if any)
         """
         resolver = get_user_resolver()
-        # Trigger cache population if not done
+        return resolver.get_cache_stats()
+
+    @mcp.tool()
+    def refresh_directory_cache() -> Dict[str, Any]:
+        """
+        Clear and repopulate the directory user cache from the People API.
+
+        Clears the existing cache and fetches all domain users from the
+        Google Workspace directory. May be slow on first run or large domains.
+
+        Returns:
+            Dict containing:
+                - populated: Whether cache has been populated
+                - user_count: Number of users in cache
+                - last_error: Last error message (if any)
+        """
+        resolver = get_user_resolver()
+        resolver.clear_cache()
         resolver._populate_cache()
         return resolver.get_cache_stats()
 
