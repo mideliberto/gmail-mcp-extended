@@ -10,11 +10,11 @@ from typing import Dict, Any, List, Optional
 import httpx
 
 from mcp.server.fastmcp import FastMCP
-from googleapiclient.discovery import build
 from google.auth.transport.requests import Request as GoogleRequest
 
 from gmail_mcp.utils.logger import get_logger
 from gmail_mcp.utils.config import get_config
+from gmail_mcp.utils.services import get_gmail_service
 from gmail_mcp.auth.token_manager import get_token_manager
 from gmail_mcp.auth.oauth import get_credentials
 from gmail_mcp.gmail.processor import (
@@ -157,8 +157,7 @@ def setup_resources(mcp: FastMCP) -> None:
             }
         
         try:
-            # Build the Gmail API service
-            service = build("gmail", "v1", credentials=credentials)
+            service = get_gmail_service(credentials)
             
             # Get the profile information
             profile = service.users().getProfile(userId="me").execute()
@@ -236,8 +235,7 @@ def setup_resources(mcp: FastMCP) -> None:
             return {"error": "Not authenticated"}
         
         try:
-            # Build the Gmail API service
-            service = build("gmail", "v1", credentials=credentials)
+            service = get_gmail_service(credentials)
             
             # Get the message
             message = service.users().messages().get(userId="me", id=email_id, format="full").execute()
@@ -303,8 +301,7 @@ def setup_resources(mcp: FastMCP) -> None:
             return {"error": "Not authenticated"}
             
         try:
-            # Build the Gmail API service
-            service = build("gmail", "v1", credentials=credentials)
+            service = get_gmail_service(credentials)
             
             # Get the thread
             thread_data = service.users().threads().get(userId="me", id=thread_id).execute()
@@ -401,8 +398,7 @@ def setup_resources(mcp: FastMCP) -> None:
             return {"error": "Not authenticated"}
             
         try:
-            # Build the Gmail API service
-            service = build("gmail", "v1", credentials=credentials)
+            service = get_gmail_service(credentials)
             
             # Get the user's email
             profile = service.users().getProfile(userId="me").execute()
@@ -665,8 +661,7 @@ print(f"Recent emails: {emails}")
             
             # Add Gmail account information if authenticated
             try:
-                # Build the Gmail API service
-                service = build("gmail", "v1", credentials=credentials)
+                service = get_gmail_service(credentials)
                 
                 # Get the profile information
                 profile = service.users().getProfile(userId="me").execute()

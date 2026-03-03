@@ -13,11 +13,11 @@ from dateutil import parser
 from zoneinfo import ZoneInfo
 from pydantic import BaseModel, Field
 
-from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from gmail_mcp.utils.logger import get_logger
 from gmail_mcp.utils.date_parser import parse_natural_date, parse_date_range
+from gmail_mcp.utils.services import get_gmail_service, get_calendar_service
 from gmail_mcp.auth.oauth import get_credentials
 
 # Get logger
@@ -292,9 +292,8 @@ def get_user_timezone() -> str:
         return "UTC"
     
     try:
-        # Build the Calendar API service
-        service = build("calendar", "v3", credentials=credentials)
-        
+        service = get_calendar_service(credentials)
+
         # Get the calendar settings
         settings = service.settings().list().execute()
         
@@ -428,12 +427,11 @@ def get_user_email() -> str:
         return ""
     
     try:
-        # Build the Gmail API service
-        service = build("gmail", "v1", credentials=credentials)
-        
+        service = get_gmail_service(credentials)
+
         # Get the profile information
         profile = service.users().getProfile(userId="me").execute()
-        
+
         # Return the email address
         return profile.get("emailAddress", "")
     except Exception as e:
@@ -572,9 +570,8 @@ def get_available_calendar_colors() -> Dict[str, Dict[str, str]]:
         return {}
     
     try:
-        # Build the Calendar API service
-        service = build("calendar", "v3", credentials=credentials)
-        
+        service = get_calendar_service(credentials)
+
         # Get the colors
         colors = service.colors().get().execute()
         
@@ -631,9 +628,8 @@ def get_free_busy_info(
         else:
             end_dt = end_time
         
-        # Build the Calendar API service
-        service = build("calendar", "v3", credentials=credentials)
-        
+        service = get_calendar_service(credentials)
+
         # Get user email
         profile = service.calendarList().get(calendarId="primary").execute()
         user_email = profile.get("id", "")

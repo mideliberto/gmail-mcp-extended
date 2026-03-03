@@ -14,10 +14,10 @@ from typing import Dict, Any, List, Optional, Tuple, Set
 from datetime import datetime, timezone
 import logging
 
-from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from gmail_mcp.utils.logger import get_logger
+from gmail_mcp.utils.services import get_gmail_service
 from gmail_mcp.auth.oauth import get_credentials
 from gmail_mcp.mcp.schemas import (
     EmailMetadata, 
@@ -252,8 +252,7 @@ def analyze_thread(thread_id: str) -> Optional[Thread]:
         return None
     
     try:
-        # Build the Gmail API service
-        service = build("gmail", "v1", credentials=credentials)
+        service = get_gmail_service(credentials)
         
         # Get the thread
         thread = service.users().threads().get(userId="me", id=thread_id).execute()
@@ -339,8 +338,7 @@ def get_sender_history(sender_email: str) -> Optional[Sender]:
         return None
     
     try:
-        # Build the Gmail API service
-        service = build("gmail", "v1", credentials=credentials)
+        service = get_gmail_service(credentials)
         
         # Search for messages from the sender
         query = f"from:{sender_email}"
@@ -533,8 +531,7 @@ def analyze_communication_patterns(sender_email: str, recipient_email: str) -> D
         return {"error": "Not authenticated"}
     
     try:
-        # Build the Gmail API service
-        service = build("gmail", "v1", credentials=credentials)
+        service = get_gmail_service(credentials)
         
         # Search for messages between the sender and recipient
         query = f"from:{sender_email} to:{recipient_email} OR from:{recipient_email} to:{sender_email}"
@@ -678,8 +675,7 @@ def find_related_emails(email_id: str, max_results: int = 10) -> List[Dict[str, 
         return []
     
     try:
-        # Build the Gmail API service
-        service = build("gmail", "v1", credentials=credentials)
+        service = get_gmail_service(credentials)
         
         # Get the original email
         message = service.users().messages().get(userId="me", id=email_id, format="full").execute()
