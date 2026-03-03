@@ -9,12 +9,11 @@ import json
 import mimetypes
 from typing import Any, Dict, List, Optional, Tuple
 
-from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload, MediaFileUpload
-from google.oauth2.credentials import Credentials
 
 from gmail_mcp.utils.logger import get_logger
 from gmail_mcp.auth.oauth import get_credentials
+from shared.service_health import get_service
 
 logger = get_logger("drive_mcp.processor")
 
@@ -52,11 +51,6 @@ class DriveProcessor:
     Processor for Google Drive operations.
     """
 
-    def __init__(self) -> None:
-        """Initialize the Drive processor."""
-        self._service = None
-        self._docs_service = None
-
     def _get_service(self) -> Any:
         """
         Get the Google Drive API service.
@@ -67,12 +61,10 @@ class DriveProcessor:
         Raises:
             RuntimeError: If authentication fails.
         """
-        if self._service is None:
-            credentials = get_credentials()
-            if not credentials:
-                raise RuntimeError("Not authenticated with Google")
-            self._service = build("drive", "v3", credentials=credentials)
-        return self._service
+        credentials = get_credentials()
+        if not credentials:
+            raise RuntimeError("Not authenticated with Google")
+        return get_service("drive", "v3", credentials)
 
     def _get_docs_service(self) -> Any:
         """
@@ -84,12 +76,10 @@ class DriveProcessor:
         Raises:
             RuntimeError: If authentication fails.
         """
-        if self._docs_service is None:
-            credentials = get_credentials()
-            if not credentials:
-                raise RuntimeError("Not authenticated with Google")
-            self._docs_service = build("docs", "v1", credentials=credentials)
-        return self._docs_service
+        credentials = get_credentials()
+        if not credentials:
+            raise RuntimeError("Not authenticated with Google")
+        return get_service("docs", "v1", credentials)
 
     # =========================================================================
     # Core File Operations
@@ -1403,9 +1393,8 @@ class DriveProcessor:
         # Note: This requires the Drive Activity API (driveactivity.googleapis.com)
         # which is a separate API from the Drive API
         try:
-            from googleapiclient.discovery import build
             credentials = get_credentials()
-            activity_service = build("driveactivity", "v2", credentials=credentials)
+            activity_service = get_service("driveactivity", "v2", credentials)
 
             request_body: Dict[str, Any] = {"pageSize": page_size}
 
