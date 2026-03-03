@@ -4,6 +4,21 @@
 > **Maintainer:** Appended by Claude Code after each task completion.
 > **Format:** Reverse chronological (newest first within each date).
 
+### Add shared service health management with age-based rotation
+**Origin:** Bug report — system-wide socket exhaustion from unclosed httplib2 transports
+**Task:** Create shared/service_health.py and integrate gmail_mcp
+**Changes:**
+- Created `shared/service_health.py` with `get_service()` and `invalidate()`
+- Module-level cache keyed by service_name:version, protected by threading.Lock()
+- Age-based rotation: rebuilds services after 4 hours, closing old httplib2 transport via `service._http.close()`
+- Credential hash comparison: rebuilds on token change
+- Refactored `gmail_mcp/utils/services.py` to delegate to shared module; public API unchanged
+- Files created: `shared/service_health.py`
+- Files modified: `gmail_mcp/utils/services.py`, `CHANGELOG.md`
+**Commits:** (pending)
+**Status:** Complete
+**Notes:** drive_mcp, docs_mcp, chat_mcp adoption is a separate task — each can switch with a one-line `get_service()` call.
+
 ---
 
 ## 2026-02-23

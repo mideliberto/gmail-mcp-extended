@@ -3,12 +3,14 @@
 ## [Unreleased]
 
 ### Added
+- `shared/service_health.py`: Shared service cache with age-based rotation (4h) and explicit httplib2 transport cleanup
 - `create_drive_file`: Added `file_path` parameter for streaming large file uploads from disk via MediaFileUpload
 - `update_drive_file`: Added `file_path` parameter for streaming large file updates from disk via MediaFileUpload
 - `DriveProcessor.create_file_from_path()`: New method using MediaFileUpload for disk-based uploads
 - `DriveProcessor.update_file_from_path()`: New method using MediaFileUpload for disk-based updates
 
 ### Changed
+- `gmail_mcp/utils/services.py`: Refactored to delegate to `shared.service_health.get_service()`; public API unchanged
 - Replaced `debug_user_resolver` with `get_directory_status` (read-only cache check) and `refresh_directory_cache` (clear + repopulate from People API)
 
 ## 2026-02-09
