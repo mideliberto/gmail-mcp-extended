@@ -8,10 +8,9 @@ Directory endpoint (for Google Workspace domains).
 import threading
 from typing import Any, Dict, Optional
 
-from googleapiclient.discovery import build
-
 from gmail_mcp.utils.logger import get_logger
 from gmail_mcp.auth.oauth import get_credentials
+from shared.service_health import get_service
 
 logger = get_logger("chat_mcp.user_resolver")
 
@@ -33,8 +32,6 @@ class UserResolver:
         self._cache: Dict[str, Dict[str, str]] = {}
         self._cache_lock = threading.Lock()
         self._cache_populated = False
-        self._service = None
-        self._service_lock = threading.Lock()
         self._last_error: Optional[str] = None
 
     def _get_service(self) -> Any:
@@ -44,13 +41,10 @@ class UserResolver:
         Returns:
             Any: The People API service.
         """
-        with self._service_lock:
-            if self._service is None:
-                credentials = get_credentials()
-                if not credentials:
-                    raise RuntimeError("Not authenticated with Google")
-                self._service = build("people", "v1", credentials=credentials)
-            return self._service
+        credentials = get_credentials()
+        if not credentials:
+            raise RuntimeError("Not authenticated with Google")
+        return get_service("people", "v1", credentials)
 
     def _populate_cache(self) -> None:
         """

@@ -7,11 +7,9 @@ This module provides functionality for interacting with the Google Chat API.
 import threading
 from typing import Any, Dict, List, Optional
 
-from googleapiclient.discovery import build
-from google.oauth2.credentials import Credentials
-
 from gmail_mcp.utils.logger import get_logger
 from gmail_mcp.auth.oauth import get_credentials
+from shared.service_health import get_service
 from chat_mcp.chat.user_resolver import get_user_resolver
 
 logger = get_logger("chat_mcp.processor")
@@ -26,16 +24,9 @@ class ChatProcessor:
     Processor for Google Chat operations.
     """
 
-    def __init__(self) -> None:
-        """Initialize the Chat processor."""
-        self._service = None
-        self._service_lock = threading.Lock()  # Issue #8: thread safety
-
     def _get_service(self) -> Any:
         """
         Get the Google Chat API service.
-
-        Thread-safe lazy initialization of the service.
 
         Returns:
             Any: The Google Chat API service.
@@ -43,13 +34,10 @@ class ChatProcessor:
         Raises:
             RuntimeError: If authentication fails.
         """
-        with self._service_lock:
-            if self._service is None:
-                credentials = get_credentials()
-                if not credentials:
-                    raise RuntimeError("Not authenticated with Google")
-                self._service = build("chat", "v1", credentials=credentials)
-            return self._service
+        credentials = get_credentials()
+        if not credentials:
+            raise RuntimeError("Not authenticated with Google")
+        return get_service("chat", "v1", credentials)
 
     # =========================================================================
     # Space Operations

@@ -11,6 +11,8 @@
 
 ### Changed
 - `drive_mcp/drive/processor.py`: Replaced per-instance service caching with `shared.service_health.get_service()`
+- `chat_mcp/chat/processor.py`: Replaced per-instance service caching with `shared.service_health.get_service()`
+- `chat_mcp/chat/user_resolver.py`: Replaced per-instance People API caching with `shared.service_health.get_service()`
 - `gmail_mcp/utils/services.py`: Refactored to delegate to `shared.service_health.get_service()`; public API unchanged
 - Replaced `debug_user_resolver` with `get_directory_status` (read-only cache check) and `refresh_directory_cache` (clear + repopulate from People API)
 
