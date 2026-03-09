@@ -14,6 +14,7 @@ from mcp.server.fastmcp import FastMCP
 from gmail_mcp.utils.logger import get_logger
 from gmail_mcp.utils.services import get_gmail_service
 from gmail_mcp.auth.oauth import get_credentials
+from gmail_mcp.mcp.tools.email_send import _detect_content_type
 
 logger = get_logger(__name__)
 
@@ -196,7 +197,8 @@ def setup_email_draft_tools(mcp: FastMCP) -> None:
         subject: Optional[str] = None,
         body: Optional[str] = None,
         cc: Optional[str] = None,
-        bcc: Optional[str] = None
+        bcc: Optional[str] = None,
+        content_type: str = "auto"
     ) -> Dict[str, Any]:
         """
         Update an existing draft.
@@ -210,6 +212,8 @@ def setup_email_draft_tools(mcp: FastMCP) -> None:
             body (str, optional): New body content
             cc (str, optional): New CC recipients, comma-separated
             bcc (str, optional): New BCC recipients, comma-separated
+            content_type (str, optional): MIME content type for the body. "plain", "html", or "auto" (default).
+                "auto" detects HTML tags in the body and uses "html" if found, "plain" otherwise.
 
         Returns:
             Dict[str, Any]: Updated draft details
@@ -252,7 +256,7 @@ def setup_email_draft_tools(mcp: FastMCP) -> None:
             if new_bcc:
                 message["bcc"] = new_bcc
 
-            message.attach(MIMEText(new_body, "plain"))
+            message.attach(MIMEText(new_body, _detect_content_type(new_body, content_type)))
 
             raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
 

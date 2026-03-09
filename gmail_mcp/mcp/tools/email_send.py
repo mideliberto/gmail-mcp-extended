@@ -27,6 +27,35 @@ from gmail_mcp.gmail.processor import (
 
 logger = get_logger(__name__)
 
+import re
+
+_HTML_PATTERN = re.compile(
+    r'(?:^\s*<(!DOCTYPE|html))'
+    r'|<(?:p|br|div|table|tr|td|th|ul|ol|li|h[1-6]|b|strong|em|i|a|img|span|blockquote|pre|code|hr)\b',
+    re.IGNORECASE
+)
+
+
+def _detect_content_type(body: str, content_type: str = "auto") -> str:
+    """Determine MIME subtype for email body.
+
+    Args:
+        body: The email body text.
+        content_type: One of "plain", "html", or "auto".
+            "auto" inspects the body for HTML indicators.
+
+    Returns:
+        "plain" or "html"
+    """
+    if content_type == "html":
+        return "html"
+    if content_type == "plain":
+        return "plain"
+    # auto-detect
+    if _HTML_PATTERN.search(body):
+        return "html"
+    return "plain"
+
 
 def setup_email_send_tools(mcp: FastMCP) -> None:
     """Set up email send tools on the FastMCP application."""
@@ -141,7 +170,7 @@ def setup_email_send_tools(mcp: FastMCP) -> None:
             return {"success": False, "error": f"Failed to prepare email reply: {e}"}
 
     @mcp.tool()
-    def send_email_reply(email_id: str, reply_text: str, include_original: bool = True) -> Dict[str, Any]:
+    def send_email_reply(email_id: str, reply_text: str, include_original: bool = True, content_type: str = "auto") -> Dict[str, Any]:
         """
         Create a draft reply to an email.
 
@@ -157,6 +186,8 @@ def setup_email_send_tools(mcp: FastMCP) -> None:
             email_id (str): The ID of the email to reply to.
             reply_text (str): The text of the reply.
             include_original (bool, optional): Whether to include the original email in the reply. Defaults to True.
+            content_type (str, optional): MIME content type for the body. "plain", "html", or "auto" (default).
+                "auto" detects HTML tags in the body and uses "html" if found, "plain" otherwise.
 
         Returns:
             Dict[str, Any]: The result of the operation, including:
@@ -213,7 +244,7 @@ def setup_email_send_tools(mcp: FastMCP) -> None:
             if metadata.cc:
                 msg["cc"] = ", ".join(metadata.cc)
 
-            msg.attach(MIMEText(reply_body, "plain"))
+            msg.attach(MIMEText(reply_body, _detect_content_type(reply_body, content_type)))
 
             encoded_message = base64.urlsafe_b64encode(msg.as_bytes()).decode()
 
@@ -306,7 +337,8 @@ def setup_email_send_tools(mcp: FastMCP) -> None:
         body: str,
         cc: Optional[str] = None,
         bcc: Optional[str] = None,
-        send_at: Optional[str] = None
+        send_at: Optional[str] = None,
+        content_type: str = "auto"
     ) -> Dict[str, Any]:
         """
         Compose and send a new email (not a reply).
@@ -320,6 +352,8 @@ def setup_email_send_tools(mcp: FastMCP) -> None:
             body (str): Email body text
             cc (str, optional): CC recipients, comma-separated
             bcc (str, optional): BCC recipients, comma-separated
+            content_type (str, optional): MIME content type for the body. "plain", "html", or "auto" (default).
+                "auto" detects HTML tags in the body and uses "html" if found, "plain" otherwise.
             send_at (str, optional): When to send the email. Supports natural language
                 (e.g., "tomorrow 8am", "next monday at 9am") or ISO format.
                 Creates a calendar reminder instead of sending immediately.
@@ -353,7 +387,7 @@ def setup_email_send_tools(mcp: FastMCP) -> None:
             if bcc:
                 message["bcc"] = bcc
 
-            message.attach(MIMEText(body, "plain"))
+            message.attach(MIMEText(body, _detect_content_type(body, content_type)))
 
             encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
 
@@ -427,7 +461,7 @@ def setup_email_send_tools(mcp: FastMCP) -> None:
             return {"success": False, "error": f"Failed to compose email: {e}"}
 
     @mcp.tool()
-    def forward_email(email_id: str, to: str, additional_message: Optional[str] = None) -> Dict[str, Any]:
+    def forward_email(email_id: str, to: str, additional_message: Optional[str] = None, content_type: str = "auto") -> Dict[str, Any]:
         """
         Forward an existing email to another recipient.
 
@@ -435,6 +469,8 @@ def setup_email_send_tools(mcp: FastMCP) -> None:
             email_id (str): The ID of the email to forward
             to (str): Recipient email address(es)
             additional_message (str, optional): Message to include above forwarded content
+            content_type (str, optional): MIME content type for the body. "plain", "html", or "auto" (default).
+                "auto" detects HTML tags in the body and uses "html" if found, "plain" otherwise.
 
         Returns:
             Dict[str, Any]: Result including draft_id for confirmation
@@ -475,7 +511,7 @@ def setup_email_send_tools(mcp: FastMCP) -> None:
             message = MIMEMultipart()
             message["to"] = to
             message["subject"] = f"Fwd: {headers.get('subject', 'No Subject')}"
-            message.attach(MIMEText(fwd_body, "plain"))
+            message.attach(MIMEText(fwd_body, _detect_content_type(fwd_body, content_type)))
 
             encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
 

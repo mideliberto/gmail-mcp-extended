@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- HTML email support: `content_type` parameter ("plain"/"html"/"auto") on `compose_email`, `send_email_reply`, `forward_email`, `update_draft`; auto-detection via `_detect_content_type` helper
 - `shared/service_health.py`: Shared service cache with age-based rotation (4h) and explicit httplib2 transport cleanup
 - `create_drive_file`: Added `file_path` parameter for streaming large file uploads from disk via MediaFileUpload
 - `update_drive_file`: Added `file_path` parameter for streaming large file updates from disk via MediaFileUpload
