@@ -6,6 +6,7 @@ This module provides all the tool definitions for the Drive MCP server.
 
 from typing import Any, Dict, List, Optional
 import base64
+import io
 import mimetypes
 import os
 
@@ -13,6 +14,7 @@ from mcp.server.fastmcp import FastMCP
 
 from gmail_mcp.utils.logger import get_logger
 from drive_mcp.drive.processor import get_drive_processor
+from drive_mcp.drive.extractors import get_extractor, GOOGLE_NATIVE_TYPES, SUPPORTED_MIME_TYPES
 
 logger = get_logger("drive_mcp.tools")
 
@@ -184,6 +186,107 @@ def setup_tools(mcp: FastMCP) -> None:
             "content": base64.b64encode(content).decode("ascii"),
             "encoding": "base64",
         }
+
+    @mcp.tool()
+    def read_file_content(
+        file_id: str,
+        max_chars: int = 100000,
+        include_tables: bool = True,
+    ) -> str:
+        """
+        Download a file from Google Drive and extract its text content.
+
+        Supports: .docx, .pdf, .txt, .csv, .md, .json, .rtf
+        For native Google Docs/Sheets/Slides, use docs_mcp or export first.
+
+        Args:
+            file_id: Google Drive file ID.
+            max_chars: Maximum characters to return (default 100K, prevents
+                       context blowout on massive files).
+            include_tables: For .docx — extract table content as markdown
+                            tables (default True).
+
+        Returns:
+            Extracted text content, prefixed with file metadata header.
+        """
+        from googleapiclient.http import MediaIoBaseDownload
+
+        processor = get_drive_processor()
+        service = processor._get_service()
+
+        # Get file metadata
+        file_meta = service.files().get(
+            fileId=file_id, fields="name,mimeType,size"
+        ).execute()
+        filename = file_meta.get("name", "unknown")
+        mime_type = file_meta.get("mimeType", "")
+        size_bytes = int(file_meta.get("size", 0))
+
+        # Validate: native Google format?
+        if mime_type in GOOGLE_NATIVE_TYPES:
+            label = GOOGLE_NATIVE_TYPES[mime_type]
+            return (
+                f"Error: File is a native {label}. "
+                "Use docs_mcp read_document for Google Docs, "
+                "or export to a supported format first."
+            )
+
+        # Validate: supported format?
+        if mime_type not in SUPPORTED_MIME_TYPES:
+            return (
+                f"Error: Unsupported format: {mime_type}. "
+                "Supported: .docx, .pdf, .txt, .csv, .md, .json, .rtf. "
+                "For Google Docs, use docs_mcp read_document."
+            )
+
+        # Validate: size limit (50MB)
+        max_size = 50 * 1024 * 1024
+        if size_bytes > max_size:
+            size_mb = size_bytes / (1024 * 1024)
+            return f"Error: File too large: {size_mb:.1f}MB (max 50MB)."
+
+        # Download file bytes
+        request = service.files().get_media(fileId=file_id)
+        buffer = io.BytesIO()
+        downloader = MediaIoBaseDownload(buffer, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+        buffer.seek(0)
+        content_bytes = buffer.read()
+
+        # Extract text content
+        extractor = get_extractor(mime_type)
+        if mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+            text = extractor(content_bytes, include_tables=include_tables)
+        else:
+            text = extractor(content_bytes)
+
+        # Truncate if needed
+        full_len = len(text)
+        truncated = False
+        if full_len > max_chars:
+            text = text[:max_chars]
+            truncated = True
+
+        # Build response with metadata header
+        header = (
+            f"=== File: {filename} ===\n"
+            f"Type: {mime_type}\n"
+            f"Size: {size_bytes} bytes\n"
+            f"Extracted: {len(text)} characters\n"
+            f"==="
+        )
+
+        result = f"{header}\n\n{text}"
+
+        if truncated:
+            result += (
+                f"\n\n--- TRUNCATED at {max_chars:,} characters "
+                f"(full document: ~{full_len:,} characters) ---"
+            )
+
+        return result
 
     @mcp.tool()
     def create_drive_file(

@@ -34,6 +34,9 @@ dependencies = [
     "dateparser>=1.2.0",
     "pyyaml>=6.0.1",
     "typing_extensions>=4.0.0;python_version<'3.11'",
+    "python-docx>=0.8.11",
+    "PyMuPDF>=1.23.0",
+    "striprtf>=0.0.26",
 ]
 
 [project.optional-dependencies]
