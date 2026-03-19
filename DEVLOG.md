@@ -4,6 +4,20 @@
 > **Maintainer:** Appended by Claude Code after each task completion.
 > **Format:** Reverse chronological (newest first within each date).
 
+### Add read_file_content tool to drive_mcp
+**Origin:** DRIVE-READ-CONTENT-SPEC-v1_0.md (Gilfoyle spec)
+**Task:** New tool to download Drive files and extract text content
+**Changes:**
+- Created `drive_mcp/drive/extractors/` with router + 4 extractors (docx, pdf, text, rtf)
+- Added `read_file_content` tool to `drive_mcp/mcp/tools/__init__.py`
+- Added python-docx, PyMuPDF, striprtf to `pyproject.toml`
+- Supports .docx (with markdown table rendering), .pdf, .txt, .csv, .md, .json, .rtf
+- Returns helpful error for Google-native formats, unsupported types, oversized files
+- Truncation at configurable max_chars (default 100K) with notice
+**Commits:** 6fd03bc
+**Status:** Complete — needs manual testing with real Drive files
+**Notes:** Spec also calls for MCP-REFERENCE.md updates in vaults (separate task for vault Dineshes)
+
 ### Add shared service health management with age-based rotation
 **Origin:** Bug report — system-wide socket exhaustion from unclosed httplib2 transports
 **Task:** Create shared/service_health.py and integrate gmail_mcp
